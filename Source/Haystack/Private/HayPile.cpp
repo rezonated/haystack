@@ -1,10 +1,10 @@
 // Copyright (c) 2026 Vanan Andreas.
 
 #include "HayPile.h"
-#include "HayLayoutComponent.h"
-#include "HayPickComponent.h"
-#include "HayPieceStateComponent.h"
-#include "HayRenderComponent.h"
+#include "HayPile/HayLayoutComponent.h"
+#include "HayPile/HayPickComponent.h"
+#include "HayPile/HayPieceStateComponent.h"
+#include "HayPile/HayRenderComponent.h"
 
 #include "Components/SphereComponent.h"
 

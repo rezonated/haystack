@@ -1,24 +1,23 @@
 // Copyright (c) 2026 Vanan Andreas.
 
-#include "HayRenderComponent.h"
-#include "HayLayoutComponent.h"
+#include "HayPile/HayRenderComponent.h"
 #include "Haystack.h"
+#include "HayPile/HayLayoutComponent.h"
 
+#include "PrimitiveSceneProxy.h"
 #include "Async/ParallelFor.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
 #include "HAL/PlatformMemory.h"
 #include "HAL/PlatformTime.h"
-#include "PrimitiveSceneProxy.h"
 
 #if WITH_EDITORONLY_DATA
-	#include "Engine/Engine.h"
-	#include "Engine/World.h"
-	#include "RHI.h"
 	#include "RenderTimer.h"
 	#include "Scalability.h"
 	#include "TimerManager.h"
+	#include "Engine/Engine.h"
+	#include "Engine/World.h"
 #endif
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(HayRenderComponent)

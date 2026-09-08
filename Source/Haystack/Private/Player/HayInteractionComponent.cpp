@@ -1,11 +1,11 @@
 // Copyright (c) 2026 Vanan Andreas.
 
-#include "HayInteractionComponent.h"
-#include "HayPickComponent.h"
-#include "HayPieceStateComponent.h"
+#include "Player/HayInteractionComponent.h"
 #include "HayPile.h"
-#include "HayRenderComponent.h"
 #include "Haystack.h"
+#include "HayPile/HayPickComponent.h"
+#include "HayPile/HayPieceStateComponent.h"
+#include "HayPile/HayRenderComponent.h"
 
 #include "EngineUtils.h"
 #include "EnhancedInputComponent.h"

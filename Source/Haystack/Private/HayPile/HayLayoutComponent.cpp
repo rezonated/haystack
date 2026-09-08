@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Vanan Andreas.
 
-#include "HayLayoutComponent.h"
+#include "HayPile/HayLayoutComponent.h"
 
 #include "Templates/TypeHash.h"
 
