@@ -103,7 +103,7 @@ bool UHayPickComponent::RayPick(const FVector& WorldOrigin, const FVector& World
 	// Loose pieces on the ground are few, test them all.
 	for (const FHayMovedPiece& Moved : State->GetMovedPieces())
 	{
-		if (Moved.State == EHayPieceState::Loose && RayHitsPiece(Origin, Direction, FVector3f(Moved.LooseTransform.GetLocation()), FQuat4f(Moved.LooseTransform.GetRotation()), HalfExtents, PieceBoundRadius, BestDistance))
+		if (Moved.State == EHayPieceState::Loose && RayHitsPiece(Origin, Direction, FVector3f(Moved.RestTransform.GetLocation()), FQuat4f(Moved.RestTransform.GetRotation()), HalfExtents, PieceBoundRadius, BestDistance))
 		{
 			BestPiece = Moved.PieceIndex;
 		}

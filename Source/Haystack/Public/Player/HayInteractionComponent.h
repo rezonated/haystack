@@ -14,7 +14,9 @@ class UStaticMeshComponent;
 
 /**
  * Hover, grab and drop of hay pieces for the pawn this sits on.
- * Hover outline and the held piece view exist only on the locally controlled pawn, so other players never see them.
+ * The owning client picks and asks, the server takes and places, the pile's moved list carries the result to everyone.
+ * The hover outline exists only on the locally controlled pawn. The held piece shows in front of the local camera and in the
+ * hand of every remote pawn.
  */
 UCLASS(ClassGroup = Hay, meta = (BlueprintSpawnableComponent))
 class UHayInteractionComponent : public UActorComponent
@@ -44,7 +46,14 @@ public:
 	float Reach = 300.f;
 
 	/**
-	 * Where the held piece floats, relative to the camera.
+	 * The server accepts a grab or drop up to Reach times this from the pawn's eyes.
+	 * Covers the camera sitting off the eye point and the pawn moving during the round trip.
+	 */
+	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 1))
+	float ServerReachTolerance = 1.5f;
+
+	/**
+	 * Where the held piece floats, relative to the local camera.
 	 */
 	UPROPERTY(EditAnywhere, Category = Hay)
 	FVector HeldOffset = FVector(60.f, 0.f, -8.f);
@@ -52,13 +61,33 @@ public:
 	UPROPERTY(EditAnywhere, Category = Hay)
 	FRotator HeldRotation = FRotator(0.f, 90.f, 0.f);
 
+	/**
+	 * Socket on the pawn's skeletal mesh that carries the held piece on remote pawns.
+	 */
+	UPROPERTY(EditAnywhere, Category = Hay)
+	FName HeldSocket = TEXT("hand_r");
+
+	UPROPERTY(EditAnywhere, Category = Hay)
+	FTransform HeldSocketOffset = FTransform::Identity;
+
 	virtual void TickComponent(const float DeltaTime, const ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	virtual void BeginPlay() override;
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 private:
 	UFUNCTION()
 	void OnPawnRestarted(APawn* Pawn);
+
+	UFUNCTION()
+	void OnRep_HeldPiece();
+
+	UFUNCTION(Server, Reliable)
+	void Server_Take(const int32 PieceIndex);
+
+	UFUNCTION(Server, Reliable)
+	void Server_Place(const int32 PieceIndex, const FTransform& WorldTransform);
 
 	void BindInput();
 
@@ -70,6 +99,11 @@ private:
 
 	bool GetViewRay(FVector& OutOrigin, FVector& OutDirection) const;
 
+	/**
+	 * Server side range check for a grab or drop at a world location.
+	 */
+	bool IsWithinServerReach(const FVector& WorldLocation) const;
+
 	UPROPERTY(Transient)
 	TObjectPtr<AHayPile> Pile = nullptr;
 
@@ -78,16 +112,25 @@ private:
 
 	/**
 	 * Copy of the hovered piece rendered into custom depth only, for the outline.
+	 * Local pawn only.
 	 */
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> HoverProxy = nullptr;
 
+	/**
+	 * The piece in hand.
+	 * On the hand socket for remote pawns, in front of the camera for the local one.
+	 */
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> HeldMesh = nullptr;
 
-	int32 HoveredPiece = INDEX_NONE;
-
+	/**
+	 * Piece this pawn holds, written by the server.
+	 */
+	UPROPERTY(ReplicatedUsing = OnRep_HeldPiece)
 	int32 HeldPiece = INDEX_NONE;
+
+	int32 HoveredPiece = INDEX_NONE;
 
 	bool bInputBound = false;
 };

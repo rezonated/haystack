@@ -6,8 +6,37 @@
 #include "HayPile/HayRenderComponent.h"
 
 #include "GameFramework/Actor.h"
+#include "Net/UnrealNetwork.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(HayPieceStateComponent)
+
+void FHayMovedPieceList::PostReplicatedAdd(const TArrayView<int32>& AddedIndices, const int32 FinalSize)
+{
+	for (const int32 Index : AddedIndices)
+	{
+		Owner->ApplyMovedPiece(Index);
+	}
+}
+
+void FHayMovedPieceList::PostReplicatedChange(const TArrayView<int32>& ChangedIndices, const int32 FinalSize)
+{
+	for (const int32 Index : ChangedIndices)
+	{
+		Owner->ApplyMovedPiece(Index);
+	}
+}
+
+UHayPieceStateComponent::UHayPieceStateComponent()
+{
+	SetIsReplicatedByDefault(true);
+	MovedList.Owner = this;
+}
+
+void UHayPieceStateComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UHayPieceStateComponent, MovedList);
+}
 
 void UHayPieceStateComponent::Initialize()
 {
@@ -20,66 +49,110 @@ void UHayPieceStateComponent::Initialize()
 	}
 
 	PieceMoved.Init(false, Layout->NumPieces);
-	MovedPieces.Reset();
 	MovedIndexByPiece.Reset();
+	Render->OnCellSpawned.AddUObject(this, &UHayPieceStateComponent::OnCellSpawned);
+
+	// Entries that arrived before BeginPlay on a client, or the whole list on a late join.
+	for (int32 ItemIndex = 0; ItemIndex < MovedList.Items.Num(); ++ItemIndex)
+	{
+		ApplyMovedPiece(ItemIndex);
+	}
 }
 
 FTransform UHayPieceStateComponent::GetPieceWorldTransform(const int32 PieceIndex) const
 {
 	if (const int32* MovedIndex = MovedIndexByPiece.Find(PieceIndex))
 	{
-		return MovedPieces[*MovedIndex].LooseTransform * GetOwner()->GetActorTransform();
+		return MovedList.Items[*MovedIndex].RestTransform * GetOwner()->GetActorTransform();
 	}
 
 	return Layout->GetPieceLocalTransform(PieceIndex) * GetOwner()->GetActorTransform();
 }
 
+void UHayPieceStateComponent::ApplyMovedPiece(const int32 ItemIndex)
+{
+	if (PieceMoved.IsEmpty())
+	{
+		// Not initialized yet.
+		// Initialize replays the whole list.
+		return;
+	}
+
+	const FHayMovedPiece& Moved = MovedList.Items[ItemIndex];
+	if (!PieceMoved[Moved.PieceIndex])
+	{
+		PieceMoved[Moved.PieceIndex] = true;
+		MovedIndexByPiece.Add(Moved.PieceIndex, ItemIndex);
+		Render->RevealBelow(Moved.PieceIndex);
+	}
+
+	if (Moved.State == EHayPieceState::Held)
+	{
+		Render->HideInstance(Moved.PieceIndex, Moved.RestTransform);
+	}
+	else
+	{
+		Render->SetInstanceTransform(Moved.PieceIndex, Moved.RestTransform);
+	}
+}
+
+void UHayPieceStateComponent::OnCellSpawned(const int32 CellIndex, TArrayView<const FTransform> LocalTransforms)
+{
+	const FHayCell& Cell = Layout->GetCells()[CellIndex];
+	for (int32 ItemIndex = 0; ItemIndex < MovedList.Items.Num(); ++ItemIndex)
+	{
+		const int32 PieceIndex = MovedList.Items[ItemIndex].PieceIndex;
+		if (PieceIndex >= Cell.FirstPiece && PieceIndex < Cell.FirstPiece + Cell.PieceCount)
+		{
+			ApplyMovedPiece(ItemIndex);
+		}
+	}
+}
+
 bool UHayPieceStateComponent::TakePiece(const int32 PieceIndex)
 {
-	if (!Layout || PieceIndex < 0 || PieceIndex >= Layout->NumPieces)
+	if (!Layout || !GetOwner()->HasAuthority() || PieceIndex < 0 || PieceIndex >= Layout->NumPieces)
 	{
 		return false;
 	}
 
-	FTransform RestTransform;
+	int32 ItemIndex;
 	if (const int32* MovedIndex = MovedIndexByPiece.Find(PieceIndex))
 	{
-		FHayMovedPiece& Moved = MovedPieces[*MovedIndex];
-		if (Moved.State == EHayPieceState::Held)
+		ItemIndex = *MovedIndex;
+		if (MovedList.Items[ItemIndex].State == EHayPieceState::Held)
 		{
 			return false;
 		}
-
-		Moved.State = EHayPieceState::Held;
-		RestTransform = Moved.LooseTransform;
 	}
 	else
 	{
-		PieceMoved[PieceIndex] = true;
-		MovedIndexByPiece.Add(PieceIndex, MovedPieces.Num());
-		FHayMovedPiece& Moved = MovedPieces.AddDefaulted_GetRef();
-		Moved.PieceIndex = PieceIndex;
-		Moved.State = EHayPieceState::Held;
-		RestTransform = Layout->GetPieceLocalTransform(PieceIndex);
-		Render->RevealBelow(PieceIndex);
+		ItemIndex = MovedList.Items.AddDefaulted();
+		MovedList.Items[ItemIndex].PieceIndex = PieceIndex;
+		MovedList.Items[ItemIndex].RestTransform = Layout->GetPieceLocalTransform(PieceIndex);
 	}
 
-	Render->HideInstance(PieceIndex, RestTransform);
+	FHayMovedPiece& Moved = MovedList.Items[ItemIndex];
+	Moved.State = EHayPieceState::Held;
+	MovedList.MarkItemDirty(Moved);
+	ApplyMovedPiece(ItemIndex);
+
 	return true;
 }
 
 bool UHayPieceStateComponent::PlacePiece(const int32 PieceIndex, const FTransform& WorldTransform)
 {
 	const int32* MovedIndex = MovedIndexByPiece.Find(PieceIndex);
-	if (!MovedIndex || MovedPieces[*MovedIndex].State != EHayPieceState::Held)
+	if (!GetOwner()->HasAuthority() || !MovedIndex || MovedList.Items[*MovedIndex].State != EHayPieceState::Held)
 	{
 		return false;
 	}
 
-	FHayMovedPiece& Moved = MovedPieces[*MovedIndex];
+	FHayMovedPiece& Moved = MovedList.Items[*MovedIndex];
 	Moved.State = EHayPieceState::Loose;
-	Moved.LooseTransform = WorldTransform.GetRelativeTransform(GetOwner()->GetActorTransform());
-	Moved.LooseTransform.SetScale3D(FVector::OneVector);
-	Render->SetInstanceTransform(PieceIndex, Moved.LooseTransform);
+	Moved.RestTransform = WorldTransform.GetRelativeTransform(GetOwner()->GetActorTransform());
+	Moved.RestTransform.SetScale3D(FVector::OneVector);
+	MovedList.MarkItemDirty(Moved);
+	ApplyMovedPiece(*MovedIndex);
 	return true;
 }

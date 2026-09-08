@@ -11,17 +11,25 @@
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
 #include "Camera/CameraComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
-#include "Materials/MaterialInterface.h"
+#include "Net/UnrealNetwork.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(HayInteractionComponent)
 
 UHayInteractionComponent::UHayInteractionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
+	SetIsReplicatedByDefault(true);
+}
+
+void UHayInteractionComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UHayInteractionComponent, HeldPiece);
 }
 
 void UHayInteractionComponent::BeginPlay()
@@ -45,6 +53,24 @@ void UHayInteractionComponent::BeginPlay()
 		UE_LOG(LogHay, Error, TEXT("%s: HayInteraction must sit on a Pawn"), *GetOwner()->GetName());
 		return;
 	}
+
+	// Every pawn gets a held mesh in its hand.
+	// The local pawn moves it to the camera once it knows it is local.
+	HeldMesh = NewObject<UStaticMeshComponent>(Pawn, TEXT("HayHeldMesh"));
+	HeldMesh->SetStaticMesh(Pile->GetRender()->HayMesh);
+	HeldMesh->SetCastShadow(false);
+	HeldMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HeldMesh->SetVisibility(HeldPiece != INDEX_NONE);
+	if (USkeletalMeshComponent* Body = Pawn->FindComponentByClass<USkeletalMeshComponent>())
+	{
+		HeldMesh->SetupAttachment(Body, HeldSocket);
+		HeldMesh->SetRelativeTransform(HeldSocketOffset);
+	}
+	else
+	{
+		HeldMesh->SetupAttachment(Pawn->GetRootComponent());
+	}
+	HeldMesh->RegisterComponent();
 
 	Pawn->ReceiveRestartedDelegate.AddDynamic(this, &UHayInteractionComponent::OnPawnRestarted);
 	if (Pawn->IsLocallyControlled())
@@ -83,12 +109,13 @@ void UHayInteractionComponent::OnPawnRestarted(APawn* Pawn)
 		UE_LOG(LogHay, Warning, TEXT("%s: no OutlineMaterial set, hover has no outline"), *Pawn->GetName());
 	}
 
-	UStaticMesh* HayMesh = Pile->GetRender()->HayMesh;
+	HeldMesh->AttachToComponent(Camera, FAttachmentTransformRules::KeepRelativeTransform);
+	HeldMesh->SetRelativeLocationAndRotation(HeldOffset, HeldRotation);
 
 	// The proxy writes custom depth only.
 	// It bypasses Nanite so the main pass skip applies.
 	HoverProxy = NewObject<UStaticMeshComponent>(Pawn, TEXT("HayHoverProxy"));
-	HoverProxy->SetStaticMesh(HayMesh);
+	HoverProxy->SetStaticMesh(Pile->GetRender()->HayMesh);
 	HoverProxy->bDisallowNanite = true;
 	HoverProxy->SetRenderCustomDepth(true);
 	HoverProxy->SetRenderInMainPass(false);
@@ -99,15 +126,6 @@ void UHayInteractionComponent::OnPawnRestarted(APawn* Pawn)
 	HoverProxy->SetAbsolute(true, true, true);
 	HoverProxy->SetupAttachment(Pawn->GetRootComponent());
 	HoverProxy->RegisterComponent();
-
-	HeldMesh = NewObject<UStaticMeshComponent>(Pawn, TEXT("HayHeldMesh"));
-	HeldMesh->SetStaticMesh(HayMesh);
-	HeldMesh->SetCastShadow(false);
-	HeldMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	HeldMesh->SetVisibility(false);
-	HeldMesh->SetupAttachment(Camera);
-	HeldMesh->SetRelativeLocationAndRotation(HeldOffset, HeldRotation);
-	HeldMesh->RegisterComponent();
 }
 
 void UHayInteractionComponent::BindInput()
@@ -184,24 +202,68 @@ void UHayInteractionComponent::Interact()
 		return;
 	}
 
-	UHayPieceStateComponent* PieceState = Pile->GetPieceState();
 	if (HeldPiece != INDEX_NONE)
 	{
 		FTransform DropTransform;
-		if (FindDropTransform(DropTransform) && PieceState->PlacePiece(HeldPiece, DropTransform))
+		if (FindDropTransform(DropTransform))
 		{
-			HeldPiece = INDEX_NONE;
-			HeldMesh->SetVisibility(false);
+			Server_Place(HeldPiece, DropTransform);
 		}
+
 		return;
 	}
 
-	if (HoveredPiece != INDEX_NONE && PieceState->TakePiece(HoveredPiece))
+	if (HoveredPiece != INDEX_NONE)
 	{
-		HeldPiece = HoveredPiece;
+		Server_Take(HoveredPiece);
+	}
+}
+
+void UHayInteractionComponent::Server_Take_Implementation(const int32 PieceIndex)
+{
+	if (!Pile || HeldPiece != INDEX_NONE)
+	{
+		return;
+	}
+
+	UHayPieceStateComponent* PieceState = Pile->GetPieceState();
+	if (!IsWithinServerReach(PieceState->GetPieceWorldTransform(PieceIndex).GetLocation()) || !PieceState->TakePiece(PieceIndex))
+	{
+		return;
+	}
+
+	HeldPiece = PieceIndex;
+	OnRep_HeldPiece();
+}
+
+void UHayInteractionComponent::Server_Place_Implementation(const int32 PieceIndex, const FTransform& WorldTransform)
+{
+	if (!Pile || HeldPiece != PieceIndex || !IsWithinServerReach(WorldTransform.GetLocation()) || !Pile->GetPieceState()->PlacePiece(PieceIndex, WorldTransform))
+	{
+		return;
+	}
+
+	HeldPiece = INDEX_NONE;
+	OnRep_HeldPiece();
+}
+
+bool UHayInteractionComponent::IsWithinServerReach(const FVector& WorldLocation) const
+{
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	return FVector::Dist(Pawn->GetPawnViewLocation(), WorldLocation) <= Reach * ServerReachTolerance;
+}
+
+void UHayInteractionComponent::OnRep_HeldPiece()
+{
+	if (HeldMesh)
+	{
+		HeldMesh->SetVisibility(HeldPiece != INDEX_NONE);
+	}
+
+	if (HoverProxy && HeldPiece != INDEX_NONE)
+	{
 		HoveredPiece = INDEX_NONE;
 		HoverProxy->SetVisibility(false);
-		HeldMesh->SetVisibility(true);
 	}
 }
 

@@ -14,6 +14,7 @@ public class Haystack : ModuleRules
 			"Engine",
 			"InputCore",
 			"EnhancedInput",
+			"NetCore",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new[]

@@ -14,6 +14,10 @@ AHayPile::AHayPile()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
+	// The pile is one actor for the whole level, so every client always needs its moved piece list.
+	bReplicates = true;
+	bAlwaysRelevant = true;
+
 	Dome = CreateDefaultSubobject<USphereComponent>(TEXT("Root"));
 	Dome->SetMobility(EComponentMobility::Static);
 	Dome->SetCollisionProfileName(TEXT("InvisibleWall"));
