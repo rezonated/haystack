@@ -76,6 +76,13 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	/**
+	 * Piece under the crosshair on the local pawn, INDEX_NONE otherwise.
+	 */
+	int32 GetHoveredPiece() const { return HoveredPiece; }
+
+	int32 GetHeldPiece() const { return HeldPiece; }
+
 private:
 	UFUNCTION()
 	void OnPawnRestarted(APawn* Pawn);
