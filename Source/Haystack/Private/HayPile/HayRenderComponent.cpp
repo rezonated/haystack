@@ -11,7 +11,9 @@
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
 #include "HAL/PlatformMemory.h"
+#include "HAL/IConsoleManager.h"
 #include "HAL/PlatformTime.h"
+#include "UObject/UObjectIterator.h"
 
 #if WITH_EDITORONLY_DATA
 	#include "RenderTimer.h"
@@ -22,6 +24,8 @@
 #endif
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(HayRenderComponent)
+
+static FAutoConsoleCommandWithWorld ToggleHayVisibilityCommand(TEXT("Hay.ToggleVisibility"), TEXT("Shows or hides every hay chunk. The needle stays visible."), FConsoleCommandWithWorldDelegate::CreateStatic(&UHayRenderComponent::ToggleHayVisibilityInWorld));
 
 UHayRenderComponent::UHayRenderComponent()
 {
@@ -127,6 +131,30 @@ void UHayRenderComponent::HideNeedle()
 	Needle->SetVisibility(false);
 }
 
+void UHayRenderComponent::SetHayVisible(const bool bVisible)
+{
+	bHayVisible = bVisible;
+	for (UInstancedStaticMeshComponent* Chunk : CellChunks)
+	{
+		if (Chunk)
+		{
+			Chunk->SetVisibility(bVisible);
+		}
+	}
+}
+
+void UHayRenderComponent::ToggleHayVisibilityInWorld(UWorld* World)
+{
+	for (TObjectIterator<UHayRenderComponent> It; It; ++It)
+	{
+		if (It->GetWorld() == World && It->Layout)
+		{
+			It->SetHayVisible(!It->bHayVisible);
+			UE_LOG(LogHay, Log, TEXT("%s: hay %s"), *It->GetOwner()->GetName(), It->bHayVisible ? TEXT("visible") : TEXT("hidden"));
+		}
+	}
+}
+
 void UHayRenderComponent::TickComponent(const float DeltaTime, const ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -186,6 +214,7 @@ void UHayRenderComponent::SpawnCell(const int32 CellIndex)
 	Chunk->SetCastShadow(bCastShadow);
 	Chunk->bAffectDynamicIndirectLighting = bAffectIndirectLighting;
 	Chunk->bAffectDistanceFieldLighting = bAffectIndirectLighting;
+	Chunk->SetVisibility(bHayVisible);
 	Chunk->SetupAttachment(GetOwner()->GetRootComponent());
 	Chunk->RegisterComponent();
 	Chunk->PreAllocateInstancesMemory(Cell.PieceCount);

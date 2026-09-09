@@ -111,6 +111,10 @@ public:
 
 	void HideNeedle();
 
+	void SetHayVisible(const bool bVisible);
+
+	static void ToggleHayVisibilityInWorld(UWorld* World);
+
 	/**
 	 * Half extents of one piece along its own axes, from the mesh bounds.
 	 */
@@ -176,6 +180,8 @@ private:
 	TArray<FTransform> ScratchTransforms = {};
 
 	FVector3f PieceHalfExtents = FVector3f::ZeroVector;
+
+	bool bHayVisible = true;
 
 	int32 PiecesSpawned = 0;
 
