@@ -4,12 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "GameFramework/OnlineReplStructs.h"
 #include "Net/Serialization/FastArraySerializer.h"
 #include "HayPieceStateComponent.generated.h"
 
 class UHayLayoutComponent;
 class UHayPieceStateComponent;
 class UHayRenderComponent;
+
+/**
+ * Fired on every machine once the needle has a finder.
+ */
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnHayNeedleFound, const FUniqueNetIdRepl& /*Player*/);
 
 UENUM()
 enum class EHayPieceState : uint8
@@ -89,10 +95,34 @@ public:
 	UHayPieceStateComponent();
 
 	/**
+	 * Depth below the dome surface, cm, where the server may put the needle.
+	 * An upper bound past the dome radius allows anywhere down to the center.
+	 */
+	UPROPERTY(EditAnywhere, Category = Hay)
+	FFloatInterval NeedleDepth = FFloatInterval(40.f, 100000.f);
+
+	/**
 	 * Needs a built layout and an initialized render component on the owner.
-	 * Applies any entries that replicated in before this ran.
+	 * Picks the needle on the server. Applies any entries that replicated in before this ran.
 	 */
 	void Initialize();
+
+	int32 GetNeedlePiece() const { return NeedlePiece; }
+
+	/**
+	 * Net id of the player who lifted the needle, invalid until then.
+	 */
+	const FUniqueNetIdRepl& GetNeedleFoundBy() const { return NeedleFoundBy; }
+
+	bool IsNeedleFound() const { return NeedleFoundBy.IsValid(); }
+
+	FOnHayNeedleFound OnNeedleFound;
+
+	/**
+	 * Records the first player to lift the needle.
+	 * Server only, ignored for any other piece.
+	 */
+	void NotifyPieceTaken(const int32 PieceIndex, const FUniqueNetIdRepl& Player);
 
 	/**
 	 * Lifts a piece out of the pile or off the ground. Fails when the piece is already held.
@@ -124,6 +154,23 @@ public:
 	void ApplyMovedPiece(const int32 ItemIndex);
 
 private:
+	UFUNCTION()
+	void OnRep_NeedlePiece();
+
+	UFUNCTION()
+	void OnRep_NeedleFoundBy();
+
+	/**
+	 * Random piece inside NeedleDepth.
+	 * Falls back to any piece when the band holds none.
+	 */
+	int32 PickNeedlePiece() const;
+
+	/**
+	 * Hides the needle piece's hay slab and shows the needle mesh where the piece rests.
+	 */
+	void ApplyNeedle();
+
 	/**
 	 * A cell that spawns after some of its pieces moved needs those instances hidden or relocated.
 	 * Happens on clients that join late and on any machine that takes a piece before the cells below it spawn.
@@ -138,6 +185,12 @@ private:
 
 	UPROPERTY(Replicated)
 	FHayMovedPieceList MovedList;
+
+	UPROPERTY(ReplicatedUsing = OnRep_NeedlePiece)
+	int32 NeedlePiece = INDEX_NONE;
+
+	UPROPERTY(ReplicatedUsing = OnRep_NeedleFoundBy)
+	FUniqueNetIdRepl NeedleFoundBy;
 
 	/**
 	 * One bit per piece, set when the piece has a MovedList entry.

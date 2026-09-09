@@ -7,6 +7,7 @@
 #include "PrimitiveSceneProxy.h"
 #include "Async/ParallelFor.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
 #include "HAL/PlatformMemory.h"
@@ -43,6 +44,15 @@ void UHayRenderComponent::Initialize()
 	}
 
 	PieceHalfExtents = FVector3f(HayMesh->GetBounds().BoxExtent);
+
+	Needle = NewObject<UStaticMeshComponent>(GetOwner(), TEXT("HayNeedle"));
+	Needle->SetStaticMesh(NeedleMesh ? NeedleMesh : HayMesh);
+	Needle->SetMobility(EComponentMobility::Movable);
+	Needle->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Needle->SetCastShadow(bCastShadow);
+	Needle->SetVisibility(false);
+	Needle->SetupAttachment(GetOwner()->GetRootComponent());
+	Needle->RegisterComponent();
 
 	const TArray<FHayCell>& Cells = Layout->GetCells();
 	CellChunks.SetNum(Cells.Num());
@@ -104,6 +114,17 @@ void UHayRenderComponent::SetInstanceTransform(const int32 PieceIndex, const FTr
 void UHayRenderComponent::HideInstance(const int32 PieceIndex, const FTransform& RestLocalTransform)
 {
 	SetInstanceTransform(PieceIndex, FTransform(RestLocalTransform.GetRotation(), RestLocalTransform.GetLocation(), FVector(HiddenInstanceScale)));
+}
+
+void UHayRenderComponent::ShowNeedle(const FTransform& LocalTransform)
+{
+	Needle->SetRelativeTransform(LocalTransform);
+	Needle->SetVisibility(true);
+}
+
+void UHayRenderComponent::HideNeedle()
+{
+	Needle->SetVisibility(false);
 }
 
 void UHayRenderComponent::TickComponent(const float DeltaTime, const ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

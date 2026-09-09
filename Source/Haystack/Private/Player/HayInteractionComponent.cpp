@@ -16,6 +16,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(HayInteractionComponent)
@@ -60,7 +61,6 @@ void UHayInteractionComponent::BeginPlay()
 	HeldMesh->SetStaticMesh(Pile->GetRender()->HayMesh);
 	HeldMesh->SetCastShadow(false);
 	HeldMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	HeldMesh->SetVisibility(HeldPiece != INDEX_NONE);
 	if (USkeletalMeshComponent* Body = Pawn->FindComponentByClass<USkeletalMeshComponent>())
 	{
 		HeldMesh->SetupAttachment(Body, HeldSocket);
@@ -71,6 +71,7 @@ void UHayInteractionComponent::BeginPlay()
 		HeldMesh->SetupAttachment(Pawn->GetRootComponent());
 	}
 	HeldMesh->RegisterComponent();
+	OnRep_HeldPiece();
 
 	Pawn->ReceiveRestartedDelegate.AddDynamic(this, &UHayInteractionComponent::OnPawnRestarted);
 	if (Pawn->IsLocallyControlled())
@@ -234,6 +235,11 @@ void UHayInteractionComponent::Server_Take_Implementation(const int32 PieceIndex
 
 	HeldPiece = PieceIndex;
 	OnRep_HeldPiece();
+
+	if (const APlayerState* PlayerState = Cast<APawn>(GetOwner())->GetPlayerState())
+	{
+		PieceState->NotifyPieceTaken(PieceIndex, PlayerState->GetUniqueId());
+	}
 }
 
 void UHayInteractionComponent::Server_Place_Implementation(const int32 PieceIndex, const FTransform& WorldTransform)
@@ -255,8 +261,11 @@ bool UHayInteractionComponent::IsWithinServerReach(const FVector& WorldLocation)
 
 void UHayInteractionComponent::OnRep_HeldPiece()
 {
-	if (HeldMesh)
+	if (HeldMesh && Pile)
 	{
+		const UHayRenderComponent* Render = Pile->GetRender();
+		const bool				   bHoldingNeedle = HeldPiece != INDEX_NONE && HeldPiece == Pile->GetPieceState()->GetNeedlePiece();
+		HeldMesh->SetStaticMesh(bHoldingNeedle && Render->NeedleMesh ? Render->NeedleMesh : Render->HayMesh);
 		HeldMesh->SetVisibility(HeldPiece != INDEX_NONE);
 	}
 

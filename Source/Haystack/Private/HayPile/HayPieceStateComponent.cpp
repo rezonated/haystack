@@ -36,6 +36,8 @@ void UHayPieceStateComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UHayPieceStateComponent, MovedList);
+	DOREPLIFETIME(UHayPieceStateComponent, NeedlePiece);
+	DOREPLIFETIME(UHayPieceStateComponent, NeedleFoundBy);
 }
 
 void UHayPieceStateComponent::Initialize()
@@ -52,10 +54,81 @@ void UHayPieceStateComponent::Initialize()
 	MovedIndexByPiece.Reset();
 	Render->OnCellSpawned.AddUObject(this, &UHayPieceStateComponent::OnCellSpawned);
 
+	if (GetOwner()->HasAuthority())
+	{
+		NeedlePiece = PickNeedlePiece();
+		const FVector NeedleLocation = GetPieceWorldTransform(NeedlePiece).GetLocation();
+		UE_LOG(LogHay, Log, TEXT("Needle is piece %d in shell %d at %s"), NeedlePiece, Layout->GetCells()[Layout->GetCellOfPiece(NeedlePiece)].Shell, *NeedleLocation.ToString());
+	}
+
 	// Entries that arrived before BeginPlay on a client, or the whole list on a late join.
 	for (int32 ItemIndex = 0; ItemIndex < MovedList.Items.Num(); ++ItemIndex)
 	{
 		ApplyMovedPiece(ItemIndex);
+	}
+	ApplyNeedle();
+}
+
+int32 UHayPieceStateComponent::PickNeedlePiece() const
+{
+	FFloatInterval Band = NeedleDepth;
+	if (Band.Min > Band.Max || Band.Min >= Layout->DomeRadius || Band.Max <= 0.f)
+	{
+		UE_LOG(LogHay, Warning, TEXT("%s: NeedleDepth %.0f to %.0f cm holds no pieces, needle placed anywhere"), *GetOwner()->GetName(), Band.Min, Band.Max);
+		Band = FFloatInterval(0.f, Layout->DomeRadius);
+	}
+
+	// Uniform over pieces, so deeper bands with more pieces are likelier.
+	// Redraw until one lands inside the depth band.
+	int32 PieceIndex;
+	do
+	{
+		PieceIndex = FMath::RandRange(0, Layout->NumPieces - 1);
+	}
+	while (!Band.Contains(Layout->DomeRadius - Layout->GetPieceLocalTransform(PieceIndex).GetLocation().Length()));
+
+	return PieceIndex;
+}
+
+void UHayPieceStateComponent::OnRep_NeedlePiece()
+{
+	ApplyNeedle();
+}
+
+void UHayPieceStateComponent::ApplyNeedle()
+{
+	if (PieceMoved.IsEmpty() || NeedlePiece == INDEX_NONE)
+	{
+		return;
+	}
+
+	if (const int32* MovedIndex = MovedIndexByPiece.Find(NeedlePiece))
+	{
+		// Moved entries already know how to draw the needle.
+		ApplyMovedPiece(*MovedIndex);
+		return;
+	}
+
+	const FTransform Rest = Layout->GetPieceLocalTransform(NeedlePiece);
+	Render->HideInstance(NeedlePiece, Rest);
+	Render->ShowNeedle(Rest);
+}
+
+void UHayPieceStateComponent::NotifyPieceTaken(const int32 PieceIndex, const FUniqueNetIdRepl& Player)
+{
+	if (GetOwner()->HasAuthority() && PieceIndex == NeedlePiece && !NeedleFoundBy.IsValid())
+	{
+		NeedleFoundBy = Player;
+		OnRep_NeedleFoundBy();
+	}
+}
+
+void UHayPieceStateComponent::OnRep_NeedleFoundBy()
+{
+	if (NeedleFoundBy.IsValid())
+	{
+		UE_LOG(LogHay, Log, TEXT("Needle found by %s"), *NeedleFoundBy.ToString());
+		OnNeedleFound.Broadcast(NeedleFoundBy);
 	}
 }
 
@@ -86,9 +159,20 @@ void UHayPieceStateComponent::ApplyMovedPiece(const int32 ItemIndex)
 		Render->RevealBelow(Moved.PieceIndex);
 	}
 
+	const bool bNeedle = Moved.PieceIndex == NeedlePiece;
 	if (Moved.State == EHayPieceState::Held)
 	{
 		Render->HideInstance(Moved.PieceIndex, Moved.RestTransform);
+		if (bNeedle)
+		{
+			Render->HideNeedle();
+		}
+	}
+	else if (bNeedle)
+	{
+		// The needle's hay slab never shows. The needle mesh takes its place.
+		Render->HideInstance(Moved.PieceIndex, Moved.RestTransform);
+		Render->ShowNeedle(Moved.RestTransform);
 	}
 	else
 	{
@@ -106,6 +190,11 @@ void UHayPieceStateComponent::OnCellSpawned(const int32 CellIndex, TArrayView<co
 		{
 			ApplyMovedPiece(ItemIndex);
 		}
+	}
+
+	if (NeedlePiece >= Cell.FirstPiece && NeedlePiece < Cell.FirstPiece + Cell.PieceCount)
+	{
+		ApplyNeedle();
 	}
 }
 

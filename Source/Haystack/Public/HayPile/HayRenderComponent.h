@@ -9,6 +9,7 @@
 class UHayLayoutComponent;
 class UInstancedStaticMeshComponent;
 class UStaticMesh;
+class UStaticMeshComponent;
 
 /**
  * Fired once per cell right after its instances exist, with the pile-local
@@ -31,6 +32,13 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = Hay)
 	TObjectPtr<UStaticMesh> HayMesh = nullptr;
+
+	/**
+	 * Drawn in place of the hay slab at the needle piece.
+	 * Falls back to HayMesh when unset.
+	 */
+	UPROPERTY(EditAnywhere, Category = Hay)
+	TObjectPtr<UStaticMesh> NeedleMesh = nullptr;
 
 	/**
 	 * Shells spawned from the surface inward at start, and kept spawned below
@@ -99,6 +107,10 @@ public:
 	 */
 	void HideInstance(const int32 PieceIndex, const FTransform& RestLocalTransform);
 
+	void ShowNeedle(const FTransform& LocalTransform);
+
+	void HideNeedle();
+
 	/**
 	 * Half extents of one piece along its own axes, from the mesh bounds.
 	 */
@@ -141,6 +153,13 @@ private:
 	 */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UInstancedStaticMeshComponent>> CellChunks = {};
+
+	/**
+	 * The one piece that is not hay.
+	 * Hidden until the piece state places it.
+	 */
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> Needle = nullptr;
 
 	/**
 	 * Cells waiting to spawn, processed under SpawnBudgetMs per frame.
