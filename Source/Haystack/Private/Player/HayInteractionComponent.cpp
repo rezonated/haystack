@@ -256,7 +256,7 @@ void UHayInteractionComponent::Server_Place_Implementation(const int32 PieceInde
 bool UHayInteractionComponent::IsWithinServerReach(const FVector& WorldLocation) const
 {
 	const APawn* Pawn = Cast<APawn>(GetOwner());
-	return FVector::Dist(Pawn->GetPawnViewLocation(), WorldLocation) <= Reach * ServerReachTolerance;
+	return FVector::Dist(Pawn->GetPawnViewLocation(), WorldLocation) <= Reach + ServerReachSlack;
 }
 
 void UHayInteractionComponent::OnRep_HeldPiece()

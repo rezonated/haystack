@@ -46,11 +46,11 @@ public:
 	float Reach = 300.f;
 
 	/**
-	 * The server accepts a grab or drop up to Reach times this from the pawn's eyes.
+	 * The server accepts a grab or drop up to Reach plus this many cm from the pawn's eyes.
 	 * Covers the camera sitting off the eye point and the pawn moving during the round trip.
 	 */
-	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 1))
-	float ServerReachTolerance = 1.5f;
+	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 0))
+	float ServerReachSlack = 150.f;
 
 	/**
 	 * Where the held piece floats, relative to the local camera.
