@@ -120,6 +120,11 @@ public:
 	 */
 	FVector3f GetPieceHalfExtents() const { return PieceHalfExtents; }
 
+	/**
+	 * True once the outer shells queued at start have all spawned.
+	 */
+	bool IsInitialSpawnDone() const { return bInitialSpawnLogged; }
+
 	virtual void TickComponent(const float DeltaTime, const ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:

@@ -14,9 +14,18 @@
 			"Name": "HaystackTests",
 			"Type": "UncookedOnly",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "HaystackGauntlet",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [
+		{
+			"Name": "Gauntlet",
+			"Enabled": true
+		},
 		{
 			"Name": "EngineAssetDefinitions",
 			"Enabled": true

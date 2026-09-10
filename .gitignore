@@ -56,6 +56,10 @@ Packaged/*
 !Build/*/
 Build/*/**
 !Build/*/PakBlacklist*.txt
+# Gauntlet test nodes compiled by UAT, without what the compile leaves behind
+!Build/Scripts/**
+Build/Scripts/obj/
+Build/Scripts/*.csproj.props
 
 # Don't ignore icon files in Build
 !Build/**/*.ico
