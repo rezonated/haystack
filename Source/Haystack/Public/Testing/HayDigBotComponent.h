@@ -20,7 +20,7 @@ struct FUniqueNetIdRepl;
  * the ray meets. Walks with the NavMesh when the level has one, straight otherwise. Stops once anyone finds the needle.
  * Toggled with the console command Hay.DigBot, optional argument "needle", or added by a test controller.
  */
-UCLASS(ClassGroup = Hay)
+UCLASS(ClassGroup = Hay, MinimalAPI)
 class UHayDigBotComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -60,6 +60,13 @@ public:
 	float StandDistance = 100.f;
 
 	/**
+	 * The standing point swings up to this many degrees around the pile from the spot's own direction, so two bots
+	 * digging at the same spot do not queue for the same square meter.
+	 */
+	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 0, ClampMax = 90))
+	float StandSpreadDegrees = 30.f;
+
+	/**
 	 * Distance to the standing point that counts as arrived, cm.
 	 */
 	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 10))
@@ -70,6 +77,12 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 0.5))
 	float StuckSeconds = 3.f;
+
+	/**
+	 * Seconds of walking, progress or not, before the spot is abandoned.
+	 */
+	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 5))
+	float WalkTimeoutSeconds = 60.f;
 
 	/**
 	 * Seconds between a throw and the next take.
@@ -137,7 +150,9 @@ private:
 	void ChooseSpot(const APawn* Pawn, const float Reach);
 
 	/**
-	 * Moves the pawn toward the standing point. True once it is there.
+	 * Moves the pawn toward the standing point with movement input along a NavMesh path, straight when there is none.
+	 * Input replicates like a player's keys, so this works on clients where path following would be corrected away.
+	 * True once it is there.
 	 */
 	bool WalkToStandPoint(APawn* Pawn, const float DeltaTime);
 
@@ -162,9 +177,20 @@ private:
 
 	bool bAtStandPoint = false;
 
-	bool bMoveRequested = false;
+	/**
+	 * Distance to a path point that counts as reached, cm.
+	 */
+	static constexpr float WaypointRadius = 60.f;
+
+	bool bPathBuilt = false;
+
+	TArray<FVector> PathPoints;
+
+	int32 PathIndex = 0;
 
 	float SecondsWithoutProgress = 0.f;
+
+	float SecondsWalking = 0.f;
 
 	float BestDistanceToStand = 0.f;
 

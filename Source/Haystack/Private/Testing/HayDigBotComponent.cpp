@@ -9,10 +9,10 @@
 #include "Player/HayInteractionComponent.h"
 
 #include "EngineUtils.h"
+#include "NavigationPath.h"
 #include "NavigationSystem.h"
 #include "Containers/Ticker.h"
 #include "Engine/Engine.h"
-#include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -139,7 +139,8 @@ void UHayDigBotComponent::ChooseSpot(const APawn* Pawn, const float Reach)
 			DigSpot = PileToWorld.TransformPosition(Direction * Radius);
 		}
 
-		StandPoint = PileToWorld.TransformPosition(Direction.GetSafeNormal2D() * (Radius + StandDistance));
+		const FVector StandDirection = Direction.GetSafeNormal2D().RotateAngleAxis(FMath::FRandRange(-StandSpreadDegrees, StandSpreadDegrees), FVector::UpVector);
+		StandPoint = PileToWorld.TransformPosition(StandDirection * (Radius + StandDistance));
 		StandPoint.Z = Pawn->GetActorLocation().Z;
 
 		if (bDigTowardNeedle || FVector::Dist(StandPoint + EyeOffset, DigSpot) <= Reach)
@@ -150,8 +151,9 @@ void UHayDigBotComponent::ChooseSpot(const APawn* Pawn, const float Reach)
 
 	LastAimPoint = DigSpot;
 	bAtStandPoint = false;
-	bMoveRequested = false;
+	bPathBuilt = false;
 	SecondsWithoutProgress = 0.f;
+	SecondsWalking = 0.f;
 	BestDistanceToStand = TNumericLimits<float>::Max();
 	TakesAtSpot = 0;
 	MissesAtSpot = 0;
@@ -170,6 +172,7 @@ bool UHayDigBotComponent::WalkToStandPoint(APawn* Pawn, const float DeltaTime)
 	}
 
 	// Progress check, so a wall or the dome between here and there does not stall the run.
+	SecondsWalking += DeltaTime;
 	if (Distance < BestDistanceToStand - 1.f)
 	{
 		BestDistanceToStand = Distance;
@@ -180,25 +183,36 @@ bool UHayDigBotComponent::WalkToStandPoint(APawn* Pawn, const float DeltaTime)
 		SecondsWithoutProgress += DeltaTime;
 	}
 
-	APlayerController*	   Controller = Cast<APlayerController>(GetOwner());
-	UNavigationSystemV1*   NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
-	const bool			   bHasNavMesh = NavSystem && NavSystem->GetDefaultNavDataInstance();
-	if (bHasNavMesh)
+	if (!bPathBuilt)
 	{
-		if (!bMoveRequested)
+		PathPoints.Reset();
+		PathIndex = 0;
+		if (FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
 		{
-			UAIBlueprintHelperLibrary::SimpleMoveToLocation(Controller, StandPoint);
-			bMoveRequested = true;
+			const UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(), Pawn->GetActorLocation(), StandPoint, Pawn);
+			if (Path && Path->IsValid())
+			{
+				PathPoints = Path->PathPoints;
+			}
 		}
+		if (PathPoints.IsEmpty())
+		{
+			PathPoints.Add(StandPoint);
+		}
+		bPathBuilt = true;
 	}
-	else
+
+	while (PathIndex < PathPoints.Num() - 1 && FVector::DistXY(Pawn->GetActorLocation(), PathPoints[PathIndex]) <= WaypointRadius)
 	{
-		Pawn->AddMovementInput(ToStand.GetSafeNormal2D());
+		++PathIndex;
 	}
+
+	const FVector ToWaypoint = (PathPoints[PathIndex] - Pawn->GetActorLocation()).GetSafeNormal2D();
+	Pawn->AddMovementInput(ToWaypoint);
 
 	// Look where the feet go.
 	const FVector Velocity = Pawn->GetVelocity();
-	Controller->SetControlRotation((Velocity.SizeSquared2D() > 1.f ? Velocity : ToStand).GetSafeNormal2D().Rotation());
+	Cast<APlayerController>(GetOwner())->SetControlRotation((Velocity.SizeSquared2D() > 1.f ? Velocity.GetSafeNormal2D() : ToWaypoint).Rotation());
 
 	return false;
 }
@@ -269,11 +283,11 @@ void UHayDigBotComponent::TickComponent(const float DeltaTime, const ELevelTick 
 		if (bAtStandPoint)
 		{
 			DiggingSinceSeconds = FPlatformTime::Seconds();
-			UE_LOG(LogHay, Log, TEXT("DigBot: arrived at spot %d, digging"), Spots);
+			UE_LOG(LogHay, Log, TEXT("DigBot: arrived at spot %d along %d path points, digging"), Spots, PathPoints.Num());
 		}
-		else if (SecondsWithoutProgress > StuckSeconds)
+		else if (SecondsWithoutProgress > StuckSeconds || SecondsWalking > WalkTimeoutSeconds)
 		{
-			UE_LOG(LogHay, Warning, TEXT("DigBot: no progress toward the standing point, choosing a new spot"));
+			UE_LOG(LogHay, Warning, TEXT("DigBot: no progress toward the standing point, choosing a new spot. Pawn at %s moving %.0f cm/s, waypoint %d of %d"), *Pawn->GetActorLocation().ToCompactString(), Pawn->GetVelocity().Size(), PathIndex + 1, PathPoints.Num());
 			ChooseSpot(Pawn, Interaction->Reach * ReachFraction);
 		}
 		return;

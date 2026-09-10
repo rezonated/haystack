@@ -20,7 +20,7 @@ public class Haystack : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new[]
 		{
-			"AIModule", "CoreOnline", "NavigationSystem", "RenderCore", "RHI",
+			"CoreOnline", "NavigationSystem", "RenderCore", "RHI",
 		});
 	}
 }
