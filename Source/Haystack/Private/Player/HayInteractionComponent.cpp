@@ -39,11 +39,12 @@ void UHayInteractionComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	for (TActorIterator<AHayPile> It(GetWorld()); It; ++It)
+	for (AHayPile* WorldPile : TActorRange<AHayPile>(GetWorld()))
 	{
-		Pile = *It;
+		Pile = WorldPile;
 		break;
 	}
+
 	if (!Pile)
 	{
 		UE_LOG(LogHay, Error, TEXT("%s: no HayPile in the level"), *GetOwner()->GetName());

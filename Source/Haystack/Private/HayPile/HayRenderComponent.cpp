@@ -10,10 +10,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
-#include "HAL/PlatformMemory.h"
 #include "HAL/IConsoleManager.h"
+#include "HAL/PlatformMemory.h"
 #include "HAL/PlatformTime.h"
-#include "UObject/UObjectIterator.h"
 
 #if WITH_EDITORONLY_DATA
 	#include "RenderTimer.h"
@@ -145,12 +144,12 @@ void UHayRenderComponent::SetHayVisible(const bool bVisible)
 
 void UHayRenderComponent::ToggleHayVisibilityInWorld(UWorld* World)
 {
-	for (TObjectIterator<UHayRenderComponent> It; It; ++It)
+	for (UHayRenderComponent* HayRenderComponent : TObjectRange<UHayRenderComponent>())
 	{
-		if (It->GetWorld() == World && It->Layout)
+		if (HayRenderComponent->GetWorld() == World && HayRenderComponent->Layout)
 		{
-			It->SetHayVisible(!It->bHayVisible);
-			UE_LOG(LogHay, Log, TEXT("%s: hay %s"), *It->GetOwner()->GetName(), It->bHayVisible ? TEXT("visible") : TEXT("hidden"));
+			HayRenderComponent->SetHayVisible(!HayRenderComponent->bHayVisible);
+			UE_LOG(LogHay, Log, TEXT("%s: hay %s"), *HayRenderComponent->GetOwner()->GetName(), HayRenderComponent->bHayVisible ? TEXT("visible") : TEXT("hidden"));
 		}
 	}
 }
