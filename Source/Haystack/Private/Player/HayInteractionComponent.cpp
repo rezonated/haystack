@@ -208,13 +208,27 @@ void UHayInteractionComponent::Interact()
 
 	if (HeldPiece != INDEX_NONE)
 	{
-		Server_Drop(HeldPiece);
-		return;
+		RequestDrop();
 	}
-
-	if (HoveredPiece != INDEX_NONE)
+	else if (HoveredPiece != INDEX_NONE)
 	{
-		Server_Take(HoveredPiece);
+		RequestTake(HoveredPiece);
+	}
+}
+
+void UHayInteractionComponent::RequestTake(const int32 PieceIndex)
+{
+	if (Pile && HeldPiece == INDEX_NONE && PieceIndex != INDEX_NONE)
+	{
+		Server_Take(PieceIndex);
+	}
+}
+
+void UHayInteractionComponent::RequestDrop()
+{
+	if (Pile && HeldPiece != INDEX_NONE)
+	{
+		Server_Drop(HeldPiece);
 	}
 }
 
@@ -294,4 +308,3 @@ void UHayInteractionComponent::OnRep_HeldPiece()
 		HoverProxy->SetVisibility(false);
 	}
 }
-

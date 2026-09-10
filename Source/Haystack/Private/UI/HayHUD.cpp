@@ -68,7 +68,11 @@ void AHayHUD::DrawHUD()
 void AHayHUD::UpdatePrompt(const UHayInteractionComponent* Interaction)
 {
 	EHayPrompt Wanted = EHayPrompt::None;
-	if (Interaction && Interaction->GetHeldPiece() != INDEX_NONE)
+	if (NeedleFoundWidget)
+	{
+		// The game is over, the win message owns the screen.
+	}
+	else if (Interaction && Interaction->GetHeldPiece() != INDEX_NONE)
 	{
 		Wanted = EHayPrompt::Drop;
 	}

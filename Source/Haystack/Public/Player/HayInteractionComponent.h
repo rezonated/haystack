@@ -97,6 +97,16 @@ public:
 
 	int32 GetHeldPiece() const { return HeldPiece; }
 
+	/**
+	 * Asks the server to lift a piece. The interact key calls this with the hovered piece, bots call it directly.
+	 */
+	void RequestTake(const int32 PieceIndex);
+
+	/**
+	 * Asks the server to throw the held piece.
+	 */
+	void RequestDrop();
+
 private:
 	UFUNCTION()
 	void OnPawnRestarted(APawn* Pawn);
