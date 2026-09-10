@@ -9,6 +9,6 @@ public class HaystackEditorTarget : TargetRules
 		Type = TargetType.Editor;
 		DefaultBuildSettings = BuildSettingsVersion.Latest;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
-		ExtraModuleNames.Add("Haystack");
+		ExtraModuleNames.AddRange(new[] { "Haystack", "HaystackTests" });
 	}
 }

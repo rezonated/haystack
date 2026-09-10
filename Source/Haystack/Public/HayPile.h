@@ -17,7 +17,7 @@ class USphereComponent;
  * A blocking sphere for the pawn plus four components: layout (where pieces are), render (chunks on screen), piece state (what moved) and
  * pick (what the player is looking at).
  */
-UCLASS(Blueprintable, HideCategories = (Input, Replication, Collision, Rendering, HLOD, Physics, Networking, LevelInstance, Cooking, DataLayers, WorldPartition))
+UCLASS(Blueprintable, MinimalAPI, HideCategories = (Input, Replication, Collision, Rendering, HLOD, Physics, Networking, LevelInstance, Cooking, DataLayers, WorldPartition))
 class AHayPile : public AActor
 {
 	GENERATED_BODY()

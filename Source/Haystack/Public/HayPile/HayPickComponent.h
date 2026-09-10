@@ -60,7 +60,7 @@ struct FHayPickResult
  * piece transform, so picking never touches the renderer or regenerates
  * transforms.
  */
-UCLASS(ClassGroup = Hay, meta = (BlueprintSpawnableComponent))
+UCLASS(ClassGroup = Hay, MinimalAPI, meta = (BlueprintSpawnableComponent))
 class UHayPickComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -84,6 +84,13 @@ public:
 	 */
 	bool RayPick(const FVector& WorldOrigin, const FVector& WorldDirection, const float MaxDistance, FHayPickResult& OutResult);
 
+	/**
+	 * Ray against one piece in pile space.
+	 * A sphere test first, since almost every piece fails it, then the exact slab test in the piece's own axes.
+	 * On a hit, InOutBestDistance shrinks to the entry distance.
+	 */
+	static HAYSTACK_API bool RayHitsPiece(const FVector3f& Origin, const FVector3f& Direction, const FVector3f& PieceLocation, const FQuat4f& PieceRotation, const FVector3f& HalfExtents, const float BoundRadius, float& InOutBestDistance);
+
 private:
 	/**
 	 * Builds the cell's bucket grid with a counting sort over its pieces.
@@ -96,13 +103,6 @@ private:
 	static FIntVector BucketOf(const FHayCellPick& Pick, const FVector3f& Location, const float InverseBucketSize);
 
 	static int32 FlatBucket(const FIntVector& GridSize, const FIntVector& Bucket) { return (Bucket.Z * GridSize.Y + Bucket.Y) * GridSize.X + Bucket.X; }
-
-	/**
-	 * Ray against one piece in pile space.
-	 * A sphere test first, since almost every piece fails it, then the exact slab test in the piece's own axes.
-	 * On a hit, InOutBestDistance shrinks to the entry distance.
-	 */
-	static bool RayHitsPiece(const FVector3f& Origin, const FVector3f& Direction, const FVector3f& PieceLocation, const FQuat4f& PieceRotation, const FVector3f& HalfExtents, const float BoundRadius, float& InOutBestDistance);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UHayLayoutComponent> Layout = nullptr;

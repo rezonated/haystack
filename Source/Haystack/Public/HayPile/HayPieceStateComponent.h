@@ -86,7 +86,7 @@ struct TStructOpsTypeTraits<FHayMovedPieceList> : public TStructOpsTypeTraitsBas
  * This is the only per-piece state that changes during play and the only thing the server replicates about the pile.
  * TakePiece and PlacePiece run on the server. Clients receive the list and mirror each entry into their render component.
  */
-UCLASS(ClassGroup = Hay, meta = (BlueprintSpawnableComponent))
+UCLASS(ClassGroup = Hay, MinimalAPI, meta = (BlueprintSpawnableComponent))
 class UHayPieceStateComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -122,19 +122,19 @@ public:
 	 * Records the first player to lift the needle.
 	 * Server only, ignored for any other piece.
 	 */
-	void NotifyPieceTaken(const int32 PieceIndex, const FUniqueNetIdRepl& Player);
+	HAYSTACK_API void NotifyPieceTaken(const int32 PieceIndex, const FUniqueNetIdRepl& Player);
 
 	/**
 	 * Lifts a piece out of the pile or off the ground. Fails when the piece is already held.
 	 * Server only.
 	 */
-	bool TakePiece(const int32 PieceIndex);
+	HAYSTACK_API bool TakePiece(const int32 PieceIndex);
 
 	/**
 	 * Puts a held piece down at a world transform.
 	 * Server only.
 	 */
-	bool PlacePiece(const int32 PieceIndex, const FTransform& WorldTransform);
+	HAYSTACK_API bool PlacePiece(const int32 PieceIndex, const FTransform& WorldTransform);
 
 	/**
 	 * True for every piece with an entry in the moved list.
@@ -143,7 +143,7 @@ public:
 
 	const TArray<FHayMovedPiece>& GetMovedPieces() const { return MovedList.Items; }
 
-	FTransform GetPieceWorldTransform(const int32 PieceIndex) const;
+	HAYSTACK_API FTransform GetPieceWorldTransform(const int32 PieceIndex) const;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

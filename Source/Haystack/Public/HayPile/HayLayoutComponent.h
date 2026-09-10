@@ -38,13 +38,13 @@ struct FHayCell
  */
 struct FHayPieceRandom
 {
-	FHayPieceRandom(const uint32 Seed, const uint32 PieceIndex);
+	HAYSTACK_API FHayPieceRandom(const uint32 Seed, const uint32 PieceIndex);
 
 	/** [0, 1) */
-	float Next01();
+	HAYSTACK_API float Next01();
 
 	/** [-1, 1) */
-	float NextSigned();
+	HAYSTACK_API float NextSigned();
 
 private:
 	uint32 Base = 0;
@@ -56,7 +56,7 @@ private:
  * Where every hay piece is.
  * The dome is cut into shells, bands and wedges, and each piece's transform is a pure function of (Seed, PieceIndex), so every machine computes the same pile and nothing per piece is stored or sent.
  */
-UCLASS(ClassGroup = Hay, meta = (BlueprintSpawnableComponent))
+UCLASS(ClassGroup = Hay, MinimalAPI, meta = (BlueprintSpawnableComponent))
 class UHayLayoutComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -92,7 +92,7 @@ public:
 	/**
 	 * Cuts the dome into cells from the properties above.
 	 */
-	void Build();
+	HAYSTACK_API void Build();
 
 	bool IsBuilt() const { return !Cells.IsEmpty(); }
 
@@ -108,22 +108,22 @@ public:
 	/**
 	 * Cell that holds a piece index.
 	 */
-	int32 GetCellOfPiece(const int32 PieceIndex) const;
+	HAYSTACK_API int32 GetCellOfPiece(const int32 PieceIndex) const;
 
 	/**
 	 * Cell of a shell that contains a direction from the dome center.
 	 */
-	int32 FindCell(const int32 Shell, const FVector& LocalDirection) const;
+	HAYSTACK_API int32 FindCell(const int32 Shell, const FVector& LocalDirection) const;
 
 	/**
 	 * Transform of one piece relative to the pile actor.
 	 */
-	FTransform GetPieceLocalTransform(const int32 PieceIndex) const;
+	HAYSTACK_API FTransform GetPieceLocalTransform(const int32 PieceIndex) const;
 
 	/**
 	 * Same as GetPieceLocalTransform, when the caller already knows the cell.
 	 */
-	FTransform GetPieceLocalTransform(const FHayCell& Cell, const int32 PieceIndex) const;
+	HAYSTACK_API FTransform GetPieceLocalTransform(const FHayCell& Cell, const int32 PieceIndex) const;
 
 private:
 	/**
