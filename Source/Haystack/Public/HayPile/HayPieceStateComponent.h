@@ -102,6 +102,13 @@ public:
 	FFloatInterval NeedleDepth = FFloatInterval(40.f, 100000.f);
 
 	/**
+	 * Highest the needle may sit, as a fraction of the dome radius above the pile center. Keeps it off the top, which
+	 * nobody standing on the ground can dig into from the side.
+	 */
+	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 0.1, ClampMax = 1))
+	float NeedleMaxHeightFraction = 0.7f;
+
+	/**
 	 * Needs a built layout and an initialized render component on the owner.
 	 * Picks the needle on the server. Applies any entries that replicated in before this ran.
 	 */

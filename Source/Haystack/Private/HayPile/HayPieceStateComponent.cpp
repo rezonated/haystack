@@ -6,6 +6,8 @@
 #include "HayPile/HayRenderComponent.h"
 
 #include "GameFramework/Actor.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Net/UnrealNetwork.h"
 #include "Net/Core/PushModel/PushModel.h"
 
@@ -78,6 +80,20 @@ void UHayPieceStateComponent::Initialize()
 int32 UHayPieceStateComponent::PickNeedlePiece() const
 {
 	FFloatInterval Band = NeedleDepth;
+
+	// Tests pass -HayNeedleDepth=Min,Max to put the needle where a bot can reach it in minutes.
+	// The comma is a separator to FParse unless told otherwise.
+	FString Override;
+	if (FParse::Value(FCommandLine::Get(), TEXT("HayNeedleDepth="), Override, /*bShouldStopOnSeparator*/ false))
+	{
+		FString Min, Max;
+		if (Override.Split(TEXT(","), &Min, &Max))
+		{
+			Band = FFloatInterval(FCString::Atof(*Min), FCString::Atof(*Max));
+			UE_LOG(LogHay, Log, TEXT("%s: NeedleDepth overridden from the command line to %.0f to %.0f cm"), *GetOwner()->GetName(), Band.Min, Band.Max);
+		}
+	}
+
 	if (Band.Min > Band.Max || Band.Min >= Layout->DomeRadius || Band.Max <= 0.f)
 	{
 		UE_LOG(LogHay, Warning, TEXT("%s: NeedleDepth %.0f to %.0f cm holds no pieces, needle placed anywhere"), *GetOwner()->GetName(), Band.Min, Band.Max);
@@ -85,13 +101,16 @@ int32 UHayPieceStateComponent::PickNeedlePiece() const
 	}
 
 	// Uniform over pieces, so deeper bands with more pieces are likelier.
-	// Redraw until one lands inside the depth band.
-	int32 PieceIndex;
+	// Redraw until one lands inside the depth band and below the height cap.
+	const float MaxHeight = Layout->DomeRadius * NeedleMaxHeightFraction;
+	int32		PieceIndex;
+	FVector		Location;
 	do
 	{
 		PieceIndex = FMath::RandRange(0, Layout->NumPieces - 1);
+		Location = Layout->GetPieceLocalTransform(PieceIndex).GetLocation();
 	}
-	while (!Band.Contains(Layout->DomeRadius - Layout->GetPieceLocalTransform(PieceIndex).GetLocation().Length()));
+	while (Location.Z > MaxHeight || !Band.Contains(Layout->DomeRadius - Location.Length()));
 
 	return PieceIndex;
 }
