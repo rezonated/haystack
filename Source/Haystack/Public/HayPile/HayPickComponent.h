@@ -12,14 +12,38 @@ class UHayRenderComponent;
 
 /**
  * Ray pick data for one spawned cell.
+ * Pieces are stored in bucket order over a coarse grid of the cell's bounds, so a ray only touches the buckets it passes.
  */
 struct FHayCellPick
 {
+	/**
+	 * Piece centers grown by the piece bound radius. The cell level ray test.
+	 */
 	FBox3f Bounds = FBox3f(ForceInit);
 
+	/**
+	 * Corner of bucket (0, 0, 0). Pieces bucket by floor((Location - GridOrigin) / BucketSize).
+	 */
+	FVector3f GridOrigin = FVector3f::ZeroVector;
+
+	FIntVector GridSize = FIntVector::ZeroValue;
+
+	/**
+	 * Slot range of bucket b is [BucketStart[b], BucketStart[b + 1]). GridSize.X * Y * Z + 1 entries.
+	 */
+	TArray<int32> BucketStart = {};
+
+	/**
+	 * Per slot, in bucket order.
+	 */
 	TArray<FVector3f> Locations = {};
 
 	TArray<FQuat4f> Rotations = {};
+
+	/**
+	 * Piece offset within the cell per slot, to get back to the piece index.
+	 */
+	TArray<int32> PieceOffsets = {};
 };
 
 struct FHayPickResult
@@ -43,6 +67,12 @@ class UHayPickComponent : public UActorComponent
 
 public:
 	/**
+	 * Edge length of a pick grid bucket, cm. Smaller buckets mean fewer pieces per ray but more buckets to walk.
+	 */
+	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 10))
+	float PickBucketSize = 50.f;
+
+	/**
 	 * Needs layout, render and piece state on the owner.
 	 * Subscribes to cell spawns, so call it before the first cell spawns.
 	 */
@@ -55,7 +85,17 @@ public:
 	bool RayPick(const FVector& WorldOrigin, const FVector& WorldDirection, const float MaxDistance, FHayPickResult& OutResult);
 
 private:
+	/**
+	 * Builds the cell's bucket grid with a counting sort over its pieces.
+	 */
 	void OnCellSpawned(const int32 CellIndex, TArrayView<const FTransform> LocalTransforms);
+
+	/**
+	 * Bucket index of a location, clamped to the grid.
+	 */
+	static FIntVector BucketOf(const FHayCellPick& Pick, const FVector3f& Location, const float InverseBucketSize);
+
+	static int32 FlatBucket(const FIntVector& GridSize, const FIntVector& Bucket) { return (Bucket.Z * GridSize.Y + Bucket.Y) * GridSize.X + Bucket.X; }
 
 	/**
 	 * Ray against one piece in pile space.

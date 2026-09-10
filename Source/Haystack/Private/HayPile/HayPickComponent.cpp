@@ -30,17 +30,52 @@ void UHayPickComponent::Initialize()
 void UHayPickComponent::OnCellSpawned(const int32 CellIndex, TArrayView<const FTransform> LocalTransforms)
 {
 	FHayCellPick& Pick = CellPick[CellIndex];
-	Pick.Locations.SetNumUninitialized(LocalTransforms.Num());
-	Pick.Rotations.SetNumUninitialized(LocalTransforms.Num());
-	Pick.Bounds = FBox3f(ForceInit);
-	for (int32 PieceOffset = 0; PieceOffset < LocalTransforms.Num(); ++PieceOffset)
+	const int32	  NumPieces = LocalTransforms.Num();
+
+	FBox3f PieceBounds(ForceInit);
+	for (const FTransform& Transform : LocalTransforms)
 	{
-		Pick.Locations[PieceOffset] = FVector3f(LocalTransforms[PieceOffset].GetLocation());
-		Pick.Rotations[PieceOffset] = FQuat4f(LocalTransforms[PieceOffset].GetRotation());
-		Pick.Bounds += Pick.Locations[PieceOffset];
+		PieceBounds += FVector3f(Transform.GetLocation());
+	}
+	Pick.Bounds = PieceBounds.ExpandBy(PieceBoundRadius);
+
+	const float		InverseBucketSize = 1.f / PickBucketSize;
+	const FVector3f Extent = PieceBounds.GetSize();
+	Pick.GridOrigin = PieceBounds.Min;
+	Pick.GridSize = FIntVector(FMath::Max(1, FMath::CeilToInt32(Extent.X * InverseBucketSize)), FMath::Max(1, FMath::CeilToInt32(Extent.Y * InverseBucketSize)), FMath::Max(1, FMath::CeilToInt32(Extent.Z * InverseBucketSize)));
+	const int32 NumBuckets = Pick.GridSize.X * Pick.GridSize.Y * Pick.GridSize.Z;
+
+	// Counting sort: bucket per piece, counts to prefix sums, then scatter into slots.
+	TArray<int32> PieceBucket;
+	PieceBucket.SetNumUninitialized(NumPieces);
+	Pick.BucketStart.SetNumZeroed(NumBuckets + 1);
+	for (int32 PieceOffset = 0; PieceOffset < NumPieces; ++PieceOffset)
+	{
+		PieceBucket[PieceOffset] = FlatBucket(Pick.GridSize, BucketOf(Pick, FVector3f(LocalTransforms[PieceOffset].GetLocation()), InverseBucketSize));
+		++Pick.BucketStart[PieceBucket[PieceOffset] + 1];
+	}
+	for (int32 Bucket = 0; Bucket < NumBuckets; ++Bucket)
+	{
+		Pick.BucketStart[Bucket + 1] += Pick.BucketStart[Bucket];
 	}
 
-	Pick.Bounds = Pick.Bounds.ExpandBy(PieceBoundRadius);
+	TArray<int32> NextSlot(Pick.BucketStart);
+	Pick.Locations.SetNumUninitialized(NumPieces);
+	Pick.Rotations.SetNumUninitialized(NumPieces);
+	Pick.PieceOffsets.SetNumUninitialized(NumPieces);
+	for (int32 PieceOffset = 0; PieceOffset < NumPieces; ++PieceOffset)
+	{
+		const int32 Slot = NextSlot[PieceBucket[PieceOffset]]++;
+		Pick.Locations[Slot] = FVector3f(LocalTransforms[PieceOffset].GetLocation());
+		Pick.Rotations[Slot] = FQuat4f(LocalTransforms[PieceOffset].GetRotation());
+		Pick.PieceOffsets[Slot] = PieceOffset;
+	}
+}
+
+FIntVector UHayPickComponent::BucketOf(const FHayCellPick& Pick, const FVector3f& Location, const float InverseBucketSize)
+{
+	const FVector3f Scaled = (Location - Pick.GridOrigin) * InverseBucketSize;
+	return FIntVector(FMath::Clamp(FMath::FloorToInt32(Scaled.X), 0, Pick.GridSize.X - 1), FMath::Clamp(FMath::FloorToInt32(Scaled.Y), 0, Pick.GridSize.Y - 1), FMath::Clamp(FMath::FloorToInt32(Scaled.Z), 0, Pick.GridSize.Z - 1));
 }
 
 bool UHayPickComponent::RayHitsPiece(const FVector3f& Origin, const FVector3f& Direction, const FVector3f& PieceLocation, const FQuat4f& PieceRotation, const FVector3f& HalfExtents, const float BoundRadius, float& InOutBestDistance)
@@ -138,17 +173,42 @@ bool UHayPickComponent::RayPick(const FVector& WorldOrigin, const FVector& World
 
 		const FHayCell&		Cell = Cells[Candidate.Value];
 		const FHayCellPick& Pick = CellPick[Candidate.Value];
-		for (int32 PieceOffset = 0; PieceOffset < Cell.PieceCount; ++PieceOffset)
-		{
-			const int32 PieceIndex = Cell.FirstPiece + PieceOffset;
-			if (State->IsPieceMoved(PieceIndex))
-			{
-				continue;
-			}
 
-			if (RayHitsPiece(Origin, Direction, Pick.Locations[PieceOffset], Pick.Rotations[PieceOffset], HalfExtents, PieceBoundRadius, BestDistance))
+		// Buckets the remaining ray segment can reach, grown by the piece radius since a piece may poke out of its bucket.
+		const FVector3f	 SegmentEnd = Origin + Direction * BestDistance;
+		const float		 InverseBucketSize = 1.f / PickBucketSize;
+		const FIntVector FirstBucket = BucketOf(Pick, FVector3f::Min(Origin, SegmentEnd) - FVector3f(PieceBoundRadius), InverseBucketSize);
+		const FIntVector LastBucket = BucketOf(Pick, FVector3f::Max(Origin, SegmentEnd) + FVector3f(PieceBoundRadius), InverseBucketSize);
+
+		for (int32 Z = FirstBucket.Z; Z <= LastBucket.Z; ++Z)
+		{
+			for (int32 Y = FirstBucket.Y; Y <= LastBucket.Y; ++Y)
 			{
-				BestPiece = PieceIndex;
+				for (int32 X = FirstBucket.X; X <= LastBucket.X; ++X)
+				{
+					const FVector3f BucketMin = Pick.GridOrigin + FVector3f(X, Y, Z) * PickBucketSize;
+					const FBox3f	BucketBox = FBox3f(BucketMin, BucketMin + FVector3f(PickBucketSize)).ExpandBy(PieceBoundRadius);
+					const FVector3f Extent = Direction * BestDistance;
+					if (!FMath::LineBoxIntersection(BucketBox, Origin, Origin + Extent, Extent))
+					{
+						continue;
+					}
+
+					const int32 Bucket = FlatBucket(Pick.GridSize, FIntVector(X, Y, Z));
+					for (int32 Slot = Pick.BucketStart[Bucket]; Slot < Pick.BucketStart[Bucket + 1]; ++Slot)
+					{
+						const int32 PieceIndex = Cell.FirstPiece + Pick.PieceOffsets[Slot];
+						if (State->IsPieceMoved(PieceIndex))
+						{
+							continue;
+						}
+
+						if (RayHitsPiece(Origin, Direction, Pick.Locations[Slot], Pick.Rotations[Slot], HalfExtents, PieceBoundRadius, BestDistance))
+						{
+							BestPiece = PieceIndex;
+						}
+					}
+				}
 			}
 		}
 	}
