@@ -19,6 +19,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
+#include "Net/Core/PushModel/PushModel.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(HayInteractionComponent)
 
@@ -32,7 +33,10 @@ UHayInteractionComponent::UHayInteractionComponent()
 void UHayInteractionComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UHayInteractionComponent, HeldPiece);
+
+	FDoRepLifetimeParams Params;
+	Params.bIsPushBased = true;
+	DOREPLIFETIME_WITH_PARAMS_FAST(UHayInteractionComponent, HeldPiece, Params);
 }
 
 void UHayInteractionComponent::BeginPlay()
@@ -246,6 +250,7 @@ void UHayInteractionComponent::Server_Take_Implementation(const int32 PieceIndex
 	}
 
 	HeldPiece = PieceIndex;
+	MARK_PROPERTY_DIRTY_FROM_NAME(UHayInteractionComponent, HeldPiece, this);
 	OnRep_HeldPiece();
 
 	if (const APlayerState* PlayerState = Cast<APawn>(GetOwner())->GetPlayerState())
@@ -283,6 +288,7 @@ void UHayInteractionComponent::Server_Drop_Implementation(const int32 PieceIndex
 	Falling->Launch(Pile, PieceIndex, Mesh, FVector(Render->GetPieceHalfExtents()), Velocity);
 
 	HeldPiece = INDEX_NONE;
+	MARK_PROPERTY_DIRTY_FROM_NAME(UHayInteractionComponent, HeldPiece, this);
 	OnRep_HeldPiece();
 }
 

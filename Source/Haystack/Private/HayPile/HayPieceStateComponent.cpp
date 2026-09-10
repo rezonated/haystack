@@ -7,6 +7,7 @@
 
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
+#include "Net/Core/PushModel/PushModel.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(HayPieceStateComponent)
 
@@ -35,9 +36,13 @@ UHayPieceStateComponent::UHayPieceStateComponent()
 void UHayPieceStateComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UHayPieceStateComponent, MovedList);
-	DOREPLIFETIME(UHayPieceStateComponent, NeedlePiece);
-	DOREPLIFETIME(UHayPieceStateComponent, NeedleFoundBy);
+
+	// Push based: the server marks these dirty where it writes them, so replication never compares them per frame.
+	FDoRepLifetimeParams Params;
+	Params.bIsPushBased = true;
+	DOREPLIFETIME_WITH_PARAMS_FAST(UHayPieceStateComponent, MovedList, Params);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UHayPieceStateComponent, NeedlePiece, Params);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UHayPieceStateComponent, NeedleFoundBy, Params);
 }
 
 void UHayPieceStateComponent::Initialize()
@@ -57,6 +62,7 @@ void UHayPieceStateComponent::Initialize()
 	if (GetOwner()->HasAuthority())
 	{
 		NeedlePiece = PickNeedlePiece();
+		MARK_PROPERTY_DIRTY_FROM_NAME(UHayPieceStateComponent, NeedlePiece, this);
 		const FVector NeedleLocation = GetPieceWorldTransform(NeedlePiece).GetLocation();
 		UE_LOG(LogHay, Log, TEXT("Needle is piece %d in shell %d at %s"), NeedlePiece, Layout->GetCells()[Layout->GetCellOfPiece(NeedlePiece)].Shell, *NeedleLocation.ToString());
 	}
@@ -119,6 +125,7 @@ void UHayPieceStateComponent::NotifyPieceTaken(const int32 PieceIndex, const FUn
 	if (GetOwner()->HasAuthority() && PieceIndex == NeedlePiece && !NeedleFoundBy.IsValid())
 	{
 		NeedleFoundBy = Player;
+		MARK_PROPERTY_DIRTY_FROM_NAME(UHayPieceStateComponent, NeedleFoundBy, this);
 		OnRep_NeedleFoundBy();
 	}
 }

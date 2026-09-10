@@ -9,6 +9,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/CollisionProfile.h"
 #include "Net/UnrealNetwork.h"
+#include "Net/Core/PushModel/PushModel.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(HayFallingPiece)
 
@@ -37,8 +38,11 @@ AHayFallingPiece::AHayFallingPiece()
 void AHayFallingPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AHayFallingPiece, Mesh);
-	DOREPLIFETIME(AHayFallingPiece, HalfExtents);
+
+	FDoRepLifetimeParams Params;
+	Params.bIsPushBased = true;
+	DOREPLIFETIME_WITH_PARAMS_FAST(AHayFallingPiece, Mesh, Params);
+	DOREPLIFETIME_WITH_PARAMS_FAST(AHayFallingPiece, HalfExtents, Params);
 }
 
 void AHayFallingPiece::Launch(AHayPile* InPile, const int32 InPieceIndex, UStaticMesh* InMesh, const FVector& InHalfExtents, const FVector& InitialVelocity)
@@ -47,6 +51,8 @@ void AHayFallingPiece::Launch(AHayPile* InPile, const int32 InPieceIndex, UStati
 	PieceIndex = InPieceIndex;
 	Mesh = InMesh;
 	HalfExtents = InHalfExtents;
+	MARK_PROPERTY_DIRTY_FROM_NAME(AHayFallingPiece, Mesh, this);
+	MARK_PROPERTY_DIRTY_FROM_NAME(AHayFallingPiece, HalfExtents, this);
 	OnRep_Shape();
 
 	Body->OnComponentSleep.AddDynamic(this, &AHayFallingPiece::OnBodySleep);
