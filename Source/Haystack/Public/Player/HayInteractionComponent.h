@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "HayInteractionComponent.generated.h"
 
+class AHayFallingPiece;
 class AHayPile;
 class UCameraComponent;
 class UInputAction;
@@ -14,7 +15,8 @@ class UStaticMeshComponent;
 
 /**
  * Hover, grab and drop of hay pieces for the pawn this sits on.
- * The owning client picks and asks, the server takes and places, the pile's moved list carries the result to everyone.
+ * The owning client picks and asks, the server takes and drops. A dropped piece falls as a physics actor until it rests,
+ * then the pile's moved list carries its spot to everyone.
  * The hover outline exists only on the locally controlled pawn. The held piece shows in front of the local camera and in the
  * hand of every remote pawn.
  */
@@ -46,14 +48,14 @@ public:
 	float Reach = 300.f;
 
 	/**
-	 * The server accepts a grab or drop up to Reach plus this many cm from the pawn's eyes.
+	 * The server accepts a grab up to Reach plus this many cm from the pawn's eyes.
 	 * Covers the camera sitting off the eye point and the pawn moving during the round trip.
 	 */
 	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 0))
 	float ServerReachSlack = 150.f;
 
 	/**
-	 * Where the held piece floats, relative to the local camera.
+	 * Where the held piece floats, relative to the local camera. Also where the server releases it on drop.
 	 */
 	UPROPERTY(EditAnywhere, Category = Hay)
 	FVector HeldOffset = FVector(60.f, 0.f, -8.f);
@@ -69,6 +71,18 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = Hay)
 	FTransform HeldSocketOffset = FTransform::Identity;
+
+	/**
+	 * Speed given to a dropped piece along the view direction, cm/s, on top of the pawn's own velocity. Zero lets it fall.
+	 */
+	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 0))
+	float ThrowSpeed = 600.f;
+
+	/**
+	 * Spawned by the server where the held piece was when dropped.
+	 */
+	UPROPERTY(EditAnywhere, Category = Hay)
+	TSubclassOf<AHayFallingPiece> FallingPieceClass = nullptr;
 
 	virtual void TickComponent(const float DeltaTime, const ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
@@ -93,8 +107,11 @@ private:
 	UFUNCTION(Server, Reliable)
 	void Server_Take(const int32 PieceIndex);
 
+	/**
+	 * Releases the held piece from the hand as a falling piece.
+	 */
 	UFUNCTION(Server, Reliable)
-	void Server_Place(const int32 PieceIndex, const FTransform& WorldTransform);
+	void Server_Drop(const int32 PieceIndex);
 
 	void BindInput();
 
@@ -102,12 +119,10 @@ private:
 
 	void UpdateHover();
 
-	bool FindDropTransform(FTransform& OutWorldTransform) const;
-
 	bool GetViewRay(FVector& OutOrigin, FVector& OutDirection) const;
 
 	/**
-	 * Server side range check for a grab or drop at a world location.
+	 * Server side range check for a grab at a world location.
 	 */
 	bool IsWithinServerReach(const FVector& WorldLocation) const;
 

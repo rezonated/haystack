@@ -3,6 +3,7 @@
 #include "Player/HayInteractionComponent.h"
 #include "HayPile.h"
 #include "Haystack.h"
+#include "HayPile/HayFallingPiece.h"
 #include "HayPile/HayPickComponent.h"
 #include "HayPile/HayPieceStateComponent.h"
 #include "HayPile/HayRenderComponent.h"
@@ -25,6 +26,7 @@ UHayInteractionComponent::UHayInteractionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	SetIsReplicatedByDefault(true);
+	FallingPieceClass = AHayFallingPiece::StaticClass();
 }
 
 void UHayInteractionComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -205,12 +207,7 @@ void UHayInteractionComponent::Interact()
 
 	if (HeldPiece != INDEX_NONE)
 	{
-		FTransform DropTransform;
-		if (FindDropTransform(DropTransform))
-		{
-			Server_Place(HeldPiece, DropTransform);
-		}
-
+		Server_Drop(HeldPiece);
 		return;
 	}
 
@@ -242,12 +239,33 @@ void UHayInteractionComponent::Server_Take_Implementation(const int32 PieceIndex
 	}
 }
 
-void UHayInteractionComponent::Server_Place_Implementation(const int32 PieceIndex, const FTransform& WorldTransform)
+void UHayInteractionComponent::Server_Drop_Implementation(const int32 PieceIndex)
 {
-	if (!Pile || HeldPiece != PieceIndex || !IsWithinServerReach(WorldTransform.GetLocation()) || !Pile->GetPieceState()->PlacePiece(PieceIndex, WorldTransform))
+	if (!Pile || HeldPiece != PieceIndex)
 	{
 		return;
 	}
+	if (!FallingPieceClass)
+	{
+		UE_LOG(LogHay, Error, TEXT("%s: no FallingPieceClass set on HayInteraction, cannot drop"), *GetOwner()->GetName());
+		return;
+	}
+
+	// Release from where the held mesh sits in front of the eyes, thrown along the view on top of the pawn's velocity.
+	APawn*			 Pawn = Cast<APawn>(GetOwner());
+	const FQuat		 View = Pawn->GetControlRotation().Quaternion();
+	const FTransform Release(View * HeldRotation.Quaternion(), Pawn->GetPawnViewLocation() + View.RotateVector(HeldOffset));
+	const FVector	 Velocity = Pawn->GetVelocity() + View.GetForwardVector() * ThrowSpeed;
+
+	const UHayRenderComponent* Render = Pile->GetRender();
+	const bool				   bNeedle = PieceIndex == Pile->GetPieceState()->GetNeedlePiece();
+	UStaticMesh*			   Mesh = bNeedle && Render->NeedleMesh ? Render->NeedleMesh : Render->HayMesh;
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = Pawn;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AHayFallingPiece* Falling = GetWorld()->SpawnActor<AHayFallingPiece>(FallingPieceClass, Release, SpawnParameters);
+	Falling->Launch(Pile, PieceIndex, Mesh, FVector(Render->GetPieceHalfExtents()), Velocity);
 
 	HeldPiece = INDEX_NONE;
 	OnRep_HeldPiece();
@@ -276,34 +294,3 @@ void UHayInteractionComponent::OnRep_HeldPiece()
 	}
 }
 
-bool UHayInteractionComponent::FindDropTransform(FTransform& OutWorldTransform) const
-{
-	FVector Origin, Direction;
-	if (!GetViewRay(Origin, Direction))
-	{
-		return false;
-	}
-
-	// Hay has no collision and the dome sphere ignores visibility, so this finds floor, walls and props.
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(HayDrop), /*bTraceComplex*/ false, GetOwner());
-	FHitResult			  Hit;
-	bool				  bHit = GetWorld()->LineTraceSingleByChannel(Hit, Origin, Origin + Direction * Reach, ECC_Visibility, Params);
-	if (!bHit)
-	{
-		// Looking at nothing within reach: drop straight down from a point in front of the pawn.
-		const FVector Ahead = GetOwner()->GetActorLocation() + GetOwner()->GetActorForwardVector() * 100.f;
-		bHit = GetWorld()->LineTraceSingleByChannel(Hit, Ahead, Ahead - FVector(0.f, 0.f, 500.f), ECC_Visibility, Params);
-	}
-	if (!bHit)
-	{
-		return false;
-	}
-
-	// Lie flat on the surface with a random heading, thickness resting on it.
-	const FVector Up = Hit.ImpactNormal;
-	const FVector Heading = FRotationMatrix(FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f)).GetUnitAxis(EAxis::X);
-	const FQuat	  Rotation = FRotationMatrix::MakeFromZX(Up, Heading).ToQuat();
-	const FVector Location = Hit.ImpactPoint + Up * Pile->GetRender()->GetPieceHalfExtents().Z;
-	OutWorldTransform = FTransform(Rotation, Location);
-	return true;
-}
