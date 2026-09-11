@@ -5,6 +5,7 @@
 #
 #   .\Scripts\RunGauntletDig.ps1                                  # 2 players dig at a needle 0 to 10 cm deep, 600 s timeout
 #   .\Scripts\RunGauntletDig.ps1 -Players 3 -NeedleDepth "20,60"  # deeper needle, three players
+#   .\Scripts\RunGauntletDig.ps1 -NeedleMaxHeight 0.7               # needle allowed as high as in the game itself
 #   .\Scripts\RunGauntletDig.ps1 -Random -Timeout 1800           # random spots, no knowledge of the needle
 #   .\Scripts\RunGauntletDig.ps1 -Build "C:\Staged\Windows" -Configuration Shipping
 #   .\Scripts\RunGauntletDig.ps1 -Engine VA-UE582-src                # a registered engine instead of the .uproject's
@@ -13,6 +14,7 @@ param(
     [int]$Players = 2,
     [switch]$Random,
     [string]$NeedleDepth = "0,10",
+    [double]$NeedleMaxHeight = 0.35,
     [int]$Timeout = 600,
     [string]$Build = "editor",
     [string]$Configuration = "Development",
@@ -40,6 +42,7 @@ $args = @(
     "-HayPlayers=$Players",
     "-HayDigTimeout=$Timeout",
     "-HayNeedleDepth=$NeedleDepth",
+    "-HayNeedleMaxHeight=$NeedleMaxHeight",
     "-HayDigOut=`"$OutDir`"",
     "-log",
     "-logdir=`"$projectDir\Saved\Gauntlet`""
