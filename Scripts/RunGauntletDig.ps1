@@ -7,6 +7,7 @@
 #   .\Scripts\RunGauntletDig.ps1 -Players 3 -NeedleDepth "20,60"  # deeper needle, three players
 #   .\Scripts\RunGauntletDig.ps1 -Random -Timeout 1800           # random spots, no knowledge of the needle
 #   .\Scripts\RunGauntletDig.ps1 -Build "C:\Staged\Windows" -Configuration Shipping
+#   .\Scripts\RunGauntletDig.ps1 -Engine VA-UE582-src                # a registered engine instead of the .uproject's
 
 param(
     [int]$Players = 2,
@@ -14,14 +15,15 @@ param(
     [string]$NeedleDepth = "0,10",
     [int]$Timeout = 600,
     [string]$Build = "editor",
-    [string]$Configuration = "Development"
+    [string]$Configuration = "Development",
+    [string]$Engine = ""
 )
 
+. "$PSScriptRoot\Engine.ps1"
 $projectDir = Split-Path -Parent $PSScriptRoot
 $proj = Get-ChildItem "$projectDir\*.uproject" | Select-Object -First 1 -ExpandProperty FullName
-$assoc = (Get-Content $proj | ConvertFrom-Json).EngineAssociation
-$engine = (Get-ItemProperty "HKLM:\SOFTWARE\EpicGames\Unreal Engine\$assoc" -ErrorAction SilentlyContinue).InstalledDirectory
-if (-not $engine) { $engine = (Get-ItemProperty "HKCU:\SOFTWARE\Epic Games\Unreal Engine\Builds" -ErrorAction SilentlyContinue).$assoc }
+$engine = Resolve-Engine $Engine $proj
+Build-Editor $engine $proj
 
 # -ScriptsForProject makes UAT compile Build/Scripts/Haystack.Automation.csproj, which holds the test nodes.
 $args = @(

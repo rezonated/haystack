@@ -4,16 +4,18 @@
 #
 #   .\Scripts\RunTests.ps1                    # everything under Haystack.
 #   .\Scripts\RunTests.ps1 -Filter Haystack.Layout
+#   .\Scripts\RunTests.ps1 -Engine 5.8            # launcher engine instead of the .uproject's
 
 param(
-    [string]$Filter = "Haystack"
+    [string]$Filter = "Haystack",
+    [string]$Engine = ""
 )
 
+. "$PSScriptRoot\Engine.ps1"
 $projectDir = Split-Path -Parent $PSScriptRoot
 $proj = Get-ChildItem "$projectDir\*.uproject" | Select-Object -First 1 -ExpandProperty FullName
-$assoc = (Get-Content $proj | ConvertFrom-Json).EngineAssociation
-$engine = (Get-ItemProperty "HKLM:\SOFTWARE\EpicGames\Unreal Engine\$assoc" -ErrorAction SilentlyContinue).InstalledDirectory
-if (-not $engine) { $engine = (Get-ItemProperty "HKCU:\SOFTWARE\Epic Games\Unreal Engine\Builds" -ErrorAction SilentlyContinue).$assoc }
+$engine = Resolve-Engine $Engine $proj
+Build-Editor $engine $proj
 $exe = "$engine\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 $log = "$projectDir\Saved\Logs\Tests.log"
 

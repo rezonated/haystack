@@ -6,6 +6,7 @@
 #   .\Scripts\RunBots.ps1                      # random spots, 150 s
 #   .\Scripts\RunBots.ps1 -BotArgs needle      # dig at the needle
 #   .\Scripts\RunBots.ps1 -RunSeconds 60 -MaxFps 30
+#   .\Scripts\RunBots.ps1 -Engine 5.8               # launcher engine instead of the .uproject's
 
 param(
     [int]$RunSeconds = 150,
@@ -13,14 +14,15 @@ param(
     [string]$ExtraArgs = "",
     [int]$MaxFps = 60,
     [int]$ResX = 960,
-    [int]$ResY = 540
+    [int]$ResY = 540,
+    [string]$Engine = ""
 )
 
+. "$PSScriptRoot\Engine.ps1"
 $projectDir = Split-Path -Parent $PSScriptRoot
 $proj = Get-ChildItem "$projectDir\*.uproject" | Select-Object -First 1 -ExpandProperty FullName
-$assoc = (Get-Content $proj | ConvertFrom-Json).EngineAssociation
-$engine = (Get-ItemProperty "HKLM:\SOFTWARE\EpicGames\Unreal Engine\$assoc" -ErrorAction SilentlyContinue).InstalledDirectory
-if (-not $engine) { $engine = (Get-ItemProperty "HKCU:\SOFTWARE\Epic Games\Unreal Engine\Builds" -ErrorAction SilentlyContinue).$assoc }
+$engine = Resolve-Engine $Engine $proj
+Build-Editor $engine $proj
 $exe = "$engine\Engine\Binaries\Win64\UnrealEditor.exe"
 $map = "/Game/ThirdPersonBP/Maps/ThirdPersonExampleMap"
 $logs = "$projectDir\Saved\Logs"
