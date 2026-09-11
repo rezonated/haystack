@@ -39,7 +39,7 @@ if ($Resolutions.Count -eq 0) {
     $native = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
     $Resolutions = @("1920x1080", "2560x1440", "$($native.Width)x$($native.Height)") | Select-Object -Unique
 }
-if (-not $OutDir) { $OutDir = "$projectDir\Saved\Gauntlet\HayPerf_$(Get-Date -Format yyyyMMdd_HHmmss)" }
+if (-not $OutDir) { $OutDir = "$projectDir\Saved\Results\HayPerf_$(Get-Date -Format yyyyMMdd_HHmmss)" }
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 
 # The editor binary only runs Development. Any other configuration is cooked and staged into its own folder,

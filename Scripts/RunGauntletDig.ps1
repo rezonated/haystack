@@ -16,7 +16,8 @@ param(
     [int]$Timeout = 600,
     [string]$Build = "editor",
     [string]$Configuration = "Development",
-    [string]$Engine = ""
+    [string]$Engine = "",
+    [string]$OutDir = ""
 )
 
 . "$PSScriptRoot\Engine.ps1"
@@ -24,6 +25,8 @@ $projectDir = Split-Path -Parent $PSScriptRoot
 $proj = Get-ChildItem "$projectDir\*.uproject" | Select-Object -First 1 -ExpandProperty FullName
 $engine = Resolve-Engine $Engine $proj
 Build-Editor $engine $proj
+if (-not $OutDir) { $OutDir = "$projectDir\Saved\Results" }
+New-Item -ItemType Directory -Force $OutDir | Out-Null
 
 # -ScriptsForProject makes UAT compile Build/Scripts/Haystack.Automation.csproj, which holds the test nodes.
 $args = @(
@@ -37,10 +40,15 @@ $args = @(
     "-HayPlayers=$Players",
     "-HayDigTimeout=$Timeout",
     "-HayNeedleDepth=$NeedleDepth",
+    "-HayDigOut=`"$OutDir`"",
     "-log",
     "-logdir=`"$projectDir\Saved\Gauntlet`""
 )
 if ($Random) { $args += "-HayDigRandom" }
 
 & "$engine\Engine\Build\BatchFiles\RunUAT.bat" @args
-exit $LASTEXITCODE
+$exit = $LASTEXITCODE
+
+"=== Summary"
+Get-ChildItem "$OutDir\HayDig_*.txt" | Sort-Object LastWriteTime | Select-Object -Last 1 | ForEach-Object { "--- $($_.Name)"; Get-Content $_.FullName }
+exit $exit
