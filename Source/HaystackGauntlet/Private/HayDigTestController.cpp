@@ -8,12 +8,28 @@
 
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(HayDigTestController)
+
+static const TCHAR* NetModeName(const ENetMode Mode)
+{
+	switch (Mode)
+	{
+		case NM_Standalone:
+			return TEXT("Standalone");
+		case NM_DedicatedServer:
+			return TEXT("DedicatedServer");
+		case NM_ListenServer:
+			return TEXT("ListenServer");
+		default:
+			return TEXT("Client");
+	}
+}
 
 void UHayDigTestController::OnInit()
 {
@@ -68,6 +84,17 @@ void UHayDigTestController::OnTick(const float TimeDelta)
 	APlayerController* Controller = GetFirstPlayerController();
 	if (!bBotAdded && Controller && Controller->IsLocalController() && Controller->GetPawn())
 	{
+		// A pawn in a standalone world means the URL that should have hosted or joined never applied, so the roles
+		// would each dig their own pile and the test would pass without a single packet.
+		const ENetMode NetMode = World->GetNetMode();
+		if (NetMode == NM_Standalone)
+		{
+			UE_LOG(LogHayGauntlet, Error, TEXT("HayDigTest: running standalone, the command line URL was dropped. Shipping needs UE_ALLOW_MAP_OVERRIDE_IN_SHIPPING=1."));
+			EndTest(1);
+			return;
+		}
+		UE_LOG(LogHayGauntlet, Log, TEXT("HayDigTest: net mode %s"), NetModeName(NetMode));
+
 		UHayDigBotComponent* Bot = NewObject<UHayDigBotComponent>(Controller, TEXT("HayDigBot"));
 		Bot->bDigTowardNeedle = bTowardNeedle;
 		Bot->RegisterComponent();
@@ -83,6 +110,8 @@ void UHayDigTestController::OnNeedleFound(const FUniqueNetIdRepl& Player)
 		bFound = true;
 		FoundSeconds = FPlatformTime::Seconds();
 		MarkHeartbeatActive(TEXT("needle found"));
-		UE_LOG(LogHayGauntlet, Log, TEXT("HayDigTest: needle found after %.0f s"), FoundSeconds - StartSeconds);
+		const UWorld*			World = GetWorld();
+		const AGameStateBase*	GameState = World ? World->GetGameState() : nullptr;
+		UE_LOG(LogHayGauntlet, Log, TEXT("HayDigTest: needle found after %.0f s with %d players"), FoundSeconds - StartSeconds, GameState ? GameState->PlayerArray.Num() : 0);
 	}
 }

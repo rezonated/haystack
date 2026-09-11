@@ -12,7 +12,8 @@ struct FUniqueNetIdRepl;
 /**
  * Gauntlet controller for the multiplayer dig test, run on every role.
  * Puts a dig bot on the local player once it has a pawn and passes when anyone finds the needle. A listen server waits a
- * few seconds after the find so the clients receive it before the host exits. Fails on the timeout.
+ * few seconds after the find so the clients receive it before the host exits. Fails on the timeout, and fails at once when
+ * the role runs standalone, which means the command line URL that should have hosted or joined was dropped.
  *
  * Command line: -HayDigTimeout=<seconds>, default 600. -HayDigNeedle makes the bot dig straight at the needle.
  */

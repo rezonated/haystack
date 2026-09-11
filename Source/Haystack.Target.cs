@@ -23,6 +23,8 @@ public class HaystackTarget : TargetRules
 				bUseLoggingInShipping = true;
 				bUseConsoleInShipping = true;
 				GlobalDefinitions.Add("CSV_PROFILER_ENABLE_IN_SHIPPING=1");
+				// Shipping clients otherwise ignore the URL on the command line, which Map?listen hosting, joining and Gauntlet need.
+				GlobalDefinitions.Add("UE_ALLOW_MAP_OVERRIDE_IN_SHIPPING=1");
 			}
 		}
 	}
