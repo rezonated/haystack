@@ -20,9 +20,12 @@ $archiveDir = "$projectDir\Packaged"
 $package = "$archiveDir\Windows"
 
 "=== Packaging Shipping with $engine"
-# -nodebuginfo keeps the 1 GB Shipping .pdb out of the package, the editor's IncludeDebugFiles setting does not reach UAT from here.
+# -nodebuginfo keeps the 1 GB Shipping .pdb out of the package, the editor's IncludeDebugFiles setting does not reach UAT
+# from here. The app-local directory puts the 4 MB of VC runtime DLLs next to the executable instead of the 29 MB of
+# redistributable installers that -prereqs would add.
 & "$engine\Engine\Build\BatchFiles\RunUAT.bat" BuildCookRun "-project=`"$proj`"" -platform=Win64 -clientconfig=Shipping `
-    -build -cook -stage -pak -prereqs -nodebuginfo -package -archive "-archivedirectory=`"$archiveDir`"" -unattended -nop4
+    -build -cook -stage -pak -nodebuginfo "-applocaldirectory=`"$engine\Engine\Binaries\ThirdParty\AppLocalDependencies`"" `
+    -package -archive "-archivedirectory=`"$archiveDir`"" -unattended -nop4
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Copy-Item "$PSScriptRoot\Packaged\*.bat" $package -Force
