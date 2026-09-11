@@ -102,11 +102,12 @@ public:
 	FFloatInterval NeedleDepth = FFloatInterval(40.f, 100000.f);
 
 	/**
-	 * Highest the needle may sit, as a fraction of the dome radius above the pile center. Keeps it off the top, which
-	 * nobody standing on the ground can dig into from the side.
+	 * Highest the needle may sit above the pile base, cm. Players dig from the ground with the camera at about head
+	 * height, so head height keeps the needle where they look level and the tunnel to it as short as its depth.
+	 * Higher up the dome the look-up gets steep and the slanted tunnel crosses far more hay than the depth suggests.
 	 */
-	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 0.1, ClampMax = 1))
-	float NeedleMaxHeightFraction = 0.7f;
+	UPROPERTY(EditAnywhere, Category = Hay, meta = (ClampMin = 20, Units = cm))
+	float NeedleMaxHeight = 200.f;
 
 	/**
 	 * Needs a built layout and an initialized render component on the owner.

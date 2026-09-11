@@ -18,7 +18,6 @@ namespace UnrealGame
 	///
 	/// -HayPlayers=N total players including the host, default 2. Bots dig straight at the needle unless -HayDigRandom.
 	/// -HayNeedleDepth=Min,Max puts the needle in a depth band in cm, default 0,10 so a run ends in minutes.
-	/// -HayNeedleMaxHeight=Fraction caps how high on the dome it sits, default 0.35, bots on the ground cannot expose a high one.
 	/// -HayDigTimeout=seconds, default 600. -HayResX, -HayResY, -HayMaxFps size and cap every role, default 960x540 at 60.
 	/// -HayDigOut=dir receives a HayDig_<Configuration>_<time>.txt summary read from the role logs, default LogDir/HayDig.
 	/// </summary>
@@ -29,7 +28,6 @@ namespace UnrealGame
 		int Players;
 		bool TowardNeedle;
 		string NeedleDepth = "";
-		float NeedleMaxHeight;
 		string OutDir = "";
 
 		public HayDig(UnrealTestContext InContext) : base(InContext)
@@ -44,7 +42,6 @@ namespace UnrealGame
 			float Timeout = Globals.Params.ParseValue("HayDigTimeout", 600f);
 			TowardNeedle = !Globals.Params.ParseParam("HayDigRandom");
 			NeedleDepth = Globals.Params.ParseValue("HayNeedleDepth", "0,10");
-			NeedleMaxHeight = Globals.Params.ParseValue("HayNeedleMaxHeight", 0.35f);
 			int ResX = Globals.Params.ParseValue("HayResX", 960);
 			int ResY = Globals.Params.ParseValue("HayResY", 540);
 			int MaxFps = Globals.Params.ParseValue("HayMaxFps", 60);
@@ -60,7 +57,7 @@ namespace UnrealGame
 				Role.Controllers.Add("HayDigTest");
 				// Small windows and a frame cap. Several 4M piece instances on one GPU otherwise stall the host for seconds,
 				// which freezes the clients' movement.
-				Role.CommandLine += string.Format(" -HayDigTimeout={0}{1} -HayNeedleDepth={2} -HayNeedleMaxHeight={3} -ResX={4} -ResY={5} -log", Timeout, TowardNeedle ? " -HayDigNeedle" : "", NeedleDepth, NeedleMaxHeight, ResX, ResY);
+				Role.CommandLine += string.Format(" -HayDigTimeout={0}{1} -HayNeedleDepth={2} -ResX={3} -ResY={4} -log", Timeout, TowardNeedle ? " -HayDigNeedle" : "", NeedleDepth, ResX, ResY);
 				Role.CommandLineParams.Add("ExecCmds", string.Format("t.MaxFPS {0},r.VSync 0", MaxFps));
 				++Index;
 			}
@@ -84,7 +81,6 @@ namespace UnrealGame
 				string.Format("players={0}", Players),
 				string.Format("toward_needle={0}", TowardNeedle ? "true" : "false"),
 				string.Format("needle_depth_cm={0}", NeedleDepth),
-				string.Format("needle_max_height={0}", NeedleMaxHeight),
 				string.Format("result={0}", Result),
 			};
 

@@ -100,17 +100,9 @@ int32 UHayPieceStateComponent::PickNeedlePiece() const
 		Band = FFloatInterval(0.f, Layout->DomeRadius);
 	}
 
-	// Tests also pass -HayNeedleMaxHeight=Fraction. A needle two thirds of the way up the dome takes bots on the ground
-	// hundreds of takes to expose, one a third of the way up takes them a minute.
-	float HeightFraction = NeedleMaxHeightFraction;
-	if (FParse::Value(FCommandLine::Get(), TEXT("HayNeedleMaxHeight="), HeightFraction))
-	{
-		UE_LOG(LogHay, Log, TEXT("%s: NeedleMaxHeightFraction overridden from the command line to %.2f"), *GetOwner()->GetName(), HeightFraction);
-	}
-
 	// Uniform over pieces, so deeper bands with more pieces are likelier.
 	// Redraw until one lands inside the depth band and below the height cap.
-	const float MaxHeight = Layout->DomeRadius * HeightFraction;
+	const float MaxHeight = NeedleMaxHeight;
 	int32		PieceIndex;
 	FVector		Location;
 	do
