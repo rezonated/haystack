@@ -1,13 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Gauntlet test nodes for the Haystack project. UAT compiles this when it runs with -project=Haystack. -->
+  <!-- Gauntlet test nodes for the Haystack project. UAT compiles this when it runs with -ScriptsForProject=Haystack.uproject. -->
 
-  <PropertyGroup>
-    <!-- The installed engine registers itself here. Set EngineDir yourself for a source build in another place. -->
-    <UnrealVersion>5.8</UnrealVersion>
-    <EngineRoot Condition="'$(EngineDir)' == ''">$([MSBuild]::GetRegistryValueFromView('HKEY_LOCAL_MACHINE\SOFTWARE\EpicGames\Unreal Engine\$(UnrealVersion)', 'InstalledDirectory', null, RegistryView.Registry64, RegistryView.Registry32))</EngineRoot>
-    <EngineDir Condition="'$(EngineDir)' == ''">$(EngineRoot)\Engine</EngineDir>
-  </PropertyGroup>
-
+  <!-- EngineDir follows the engine the .uproject is associated with: UAT passes it as a global property, and
+       generating project files writes it into the .props next to this file for IDE builds. -->
+  <Import Project="$(MSBuildProjectFullPath).props" Condition="'$(EngineDir)' == '' And Exists('$(MSBuildProjectFullPath).props')" />
   <Import Project="$(EngineDir)\Source\Programs\Shared\UnrealEngine.csproj.props" />
 
   <PropertyGroup>
