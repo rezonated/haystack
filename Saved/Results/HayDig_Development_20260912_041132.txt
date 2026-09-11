@@ -1,0 +1,12 @@
+test=HayDig
+configuration=Development
+build=editor
+players=2
+toward_needle=true
+needle_depth_cm=0,10
+result=Passed
+found_after_s=44
+players_connected=2
+found_by=DESKTOP-MN0Q4TV-043F3FFF4335FFD835F3EBBC126379A2
+role=EditorGame net=ListenServer exit=0 takes=48 spots=1
+role=EditorGame_02 net=Client exit=0 takes=45 spots=1
