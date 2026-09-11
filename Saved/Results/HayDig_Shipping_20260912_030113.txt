@@ -1,0 +1,12 @@
+test=HayDig
+configuration=Shipping
+build=C:\UE_Projects\Haystack\Saved\StagedBuilds\Shipping
+players=2
+toward_needle=true
+needle_depth_cm=0,10
+result=Passed
+found_after_s=65
+players_connected=2
+found_by=DESKTOP-MN0Q4TV-83F00852447A4227F7658DA261BCEB34
+role=Client net=ListenServer exit=0 takes=72 spots=2
+role=Client_02 net=Client exit=0 takes=59 spots=3
