@@ -1,0 +1,12 @@
+label=Shipping_1920x1080
+configuration=Shipping
+resolution=1920x1080
+frames=6720
+frame_avg_ms=8.97
+frame_p99_ms=10.43
+fps_avg=111.5
+game_thread_avg_ms=1.00
+render_thread_avg_ms=2.25
+gpu_avg_ms=8.31
+used_physical_mb=1713
+csv=C:\UE_Projects\Haystack\Saved\Results\HayPerf_20260912_022047/Shipping_1920x1080.csv

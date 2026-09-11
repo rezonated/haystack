@@ -1,0 +1,10 @@
+test=HayDig
+configuration=Shipping
+build=C:\UE_Projects\Haystack\Saved\StagedBuilds\Shipping
+players=2
+toward_needle=true
+needle_depth_cm=0,10
+result=Passed
+found_after_s=22
+role=Client exit=0 takes=23 spots=1
+role=Client_02 exit=0 takes=24 spots=1

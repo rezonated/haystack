@@ -1,0 +1,12 @@
+label=Development_3840x2560
+configuration=Development
+resolution=3840x2560
+frames=1798
+frame_avg_ms=33.43
+frame_p99_ms=42.31
+fps_avg=29.9
+game_thread_avg_ms=2.16
+render_thread_avg_ms=33.43
+gpu_avg_ms=32.61
+used_physical_mb=1777
+csv=C:\UE_Projects\Haystack\Saved\Results\HayPerf_20260912_022047/Development_3840x2560.csv

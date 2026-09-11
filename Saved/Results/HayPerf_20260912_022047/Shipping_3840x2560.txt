@@ -1,0 +1,12 @@
+label=Shipping_3840x2560
+configuration=Shipping
+resolution=3840x2560
+frames=1832
+frame_avg_ms=33.21
+frame_p99_ms=37.87
+fps_avg=30.1
+game_thread_avg_ms=1.09
+render_thread_avg_ms=2.31
+gpu_avg_ms=32.53
+used_physical_mb=1697
+csv=C:\UE_Projects\Haystack\Saved\Results\HayPerf_20260912_022047/Shipping_3840x2560.csv

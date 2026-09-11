@@ -1,0 +1,12 @@
+label=Development_1920x1080
+configuration=Development
+resolution=1920x1080
+frames=6254
+frame_avg_ms=9.64
+frame_p99_ms=13.01
+fps_avg=103.8
+game_thread_avg_ms=2.05
+render_thread_avg_ms=9.63
+gpu_avg_ms=8.82
+used_physical_mb=1741
+csv=C:\UE_Projects\Haystack\Saved\Results\HayPerf_20260912_022047/Development_1920x1080.csv
